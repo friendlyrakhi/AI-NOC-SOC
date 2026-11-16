@@ -44,6 +44,13 @@ TENANT_SCOPED = {
     "correlation_overrides",
     "maintenance_windows",
     "suppression_rules",
+    # P4 AI and knowledge base
+    "ai_settings",
+    "ai_runs",
+    "ai_citations",
+    "ai_feedback",
+    "knowledge_docs",
+    "knowledge_chunks",
 }
 IDENTITY_ONLY = {"user_credentials", "sessions", "auth_challenges", "invitations"}  # no app policies
 GLOBAL = {"permissions", "alembic_version"}

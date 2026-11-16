@@ -123,7 +123,7 @@ services:
   api:
     <<: *hardening
     profiles: [core]
-    networks: [data, bus, frontend]
+    networks: [data, bus, frontend, ai]
     build:
       context: ../..
       dockerfile: infrastructure/docker/api.Dockerfile
@@ -141,8 +141,12 @@ services:
       # Optional (stream/analytics profiles). Without them those features answer 503.
       NOCSOC_KAFKA_BOOTSTRAP: redpanda:9092
       NOCSOC_CLICKHOUSE_HOST: clickhouse
+      # Optional (ai profile). Without it AI endpoints answer 503.
+      NOCSOC_AI_GATEWAY_URL: http://ai-gateway:8200
     # File names carry the settings prefix: pydantic-settings maps NOCSOC_<FIELD> to them.
     secrets:
+      - source: ai_gateway_token
+        target: nocsoc_ai_gateway_token
       - source: database_password
         target: nocsoc_database_password
       - source: auth_database_password
@@ -170,6 +174,32 @@ services:
       retries: 12
       start_period: 10s
     mem_limit: 512m
+
+  ai-gateway:
+    <<: *hardening
+    profiles: [ai]
+    networks: [ai]
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/ai-gateway.Dockerfile
+      secrets: [build_extra_ca]
+    image: nocsoc/ai-gateway:dev
+    environment:
+      NOCSOC_AI_CLOUD_EGRESS_ENABLED: "false"
+    # Only the shared API token. No data-store, bus or runner credentials (LLM06, T21).
+    secrets:
+      - source: ai_gateway_token
+        target: nocsoc_ai_gateway_token
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8200/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+    mem_limit: 256m
 
   web:
     <<: *hardening
@@ -362,13 +392,20 @@ secrets:
     file: ../secrets/clickhouse_ingest_password
   clickhouse_reader_password:
     file: ../secrets/clickhouse_reader_password
+  ai_gateway_token:
+    file: ../secrets/ai_gateway_token
 
 # Segmentation (threat model T13, SEC-CON-02): the connector runner reaches only the API and
 # the event bus. Data stores sit on `data`, which the runner is not attached to.
+# The AI gateway reaches only the API, over `ai`, which is internal (no internet). Enabling a
+# cloud model needs a deliberate override that gives the gateway an egress network
+# (docs/reports/P4-exit-review.md), on top of the gateway and tenant opt-in settings.
 networks:
   data:
   bus:
   frontend:
+  ai:
+    internal: true
 
 volumes:
   pgdata:

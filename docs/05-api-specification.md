@@ -144,6 +144,13 @@ Legend: **Perm** = required permission. (P#) = phase delivered.
 | GET/PUT | `/ai/settings` | `ai:admin` (step-up for egress) | provider routing, egress, redaction, budget |
 | GET | `/ai/usage` | `ai:admin` | |
 
+**As built in P4:**
+- **Runs:** `POST /ai/alerts/{id}/summary`, `POST /ai/incidents/{id}/{summary|triage|rca|pir-draft}`, `POST /ai/query-assist {intent}` (returns a suggested query; never runs it), and `POST /ai/chat {subject_type, subject_id, question}` (JSON response; SSE streaming deferred). Each needs `ai:use` plus read access to the subject.
+- **Reading runs:** `GET /ai/runs?subject_type&subject_id` and `GET /ai/runs/{id}` (`ai:use`; a separate `ai:read_runs` was not needed), plus `POST /ai/runs/{id}/feedback`.
+- **Administration:** `GET/PUT /ai/settings` (`ai:admin`, step-up to change; a cloud provider requires `allow_cloud`) and `GET /ai/usage`.
+- **Knowledge:** `GET /knowledge/docs`, `GET /knowledge/docs/{id}`, `POST /knowledge/docs` and `DELETE /knowledge/docs/{id}` (`knowledge:publish` + step-up; instruction-like content is refused), and `GET /knowledge/search?q=`.
+- **Run fields:** responses carry `validation_status`, `validation_notes`, `confidence`, `suspicious_count`, the evidence index (`ref`, `type`, `id`, `title`, `suspicious`) and `ai_generated: true`.
+
 AI response shape:
 ```json
 {

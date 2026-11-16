@@ -17,7 +17,8 @@ import {
   setTaskStatus,
 } from "@/app/actions/incidents";
 import type { Me } from "@/lib/server/api";
-import type { IncidentOut, IncidentTask, LinkedAlert, TimelineEntry } from "@/lib/server/pipeline";
+import { AiPanel } from "@/components/ai-panel";
+import type { AiRun, IncidentOut, IncidentTask, LinkedAlert, TimelineEntry } from "@/lib/server/pipeline";
 import { formatTime, minutes } from "@/lib/format";
 
 /** Real incident (from correlation or declared by an analyst) with its live workflow. */
@@ -99,8 +100,10 @@ export function IncidentDetail({
   alerts,
   timeline,
   tasks,
+  aiRuns,
 }: {
   me: Me;
+  aiRuns: AiRun[];
   incident: IncidentOut;
   alerts: LinkedAlert[];
   timeline: TimelineEntry[];
@@ -324,8 +327,13 @@ export function IncidentDetail({
           )}
         </div>
       </div>
+      {(me.permissions.includes("ai:use") || aiRuns.length > 0) && (
+        <div className="mt-6">
+          <AiPanel incidentId={i.id} runs={aiRuns} canUse={me.permissions.includes("ai:use") && i.status !== "closed"} />
+        </div>
+      )}
       <SectionTitle>Summary</SectionTitle>
-      <p className="text-sm whitespace-pre-wrap">{i.summary || "No summary yet. AI-drafted summaries arrive with phase P4."}</p>
+      <p className="text-sm whitespace-pre-wrap">{i.summary || "No analyst summary yet. Use the AI copilot above for a cited draft."}</p>
     </>
   );
 }

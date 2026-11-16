@@ -145,6 +145,10 @@ erDiagram
 | `knowledge_docs` | id, tenant_id, kind(`runbook/kb/postmortem`), title, source, body, version | |
 | `knowledge_chunks` | id, tenant_id, doc_id, ordinal, text, embedding vector(N), embedding_model | HNSW index per embedding model dimension. |
 
+**As built in P4 (migration 0004):**
+- **AI tables:** `ai_settings` (one row per tenant: provider, `allow_cloud`, `redact_pii`, `daily_token_budget`; the CHECK makes `anthropic` require `allow_cloud`), `ai_runs` (append-only for the app; stores the evidence index, the validated output, `validation_status` and notes, token usage and redaction counts; the raw prompt is not stored), `ai_citations`, and `ai_feedback`.
+- **Knowledge base:** `knowledge_docs` and `knowledge_chunks` (`vector(256)`, HNSW cosine index, `embedding_model` `hash-256-v1`). All of them are FORCE RLS.
+
 ### 2.10 Audit & notifications
 | Table | Key columns | Notes |
 |-------|-------------|-------|

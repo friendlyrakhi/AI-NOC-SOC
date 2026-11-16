@@ -85,6 +85,24 @@ export type MaintenanceWindow = Schemas["MaintenanceOut"];
 export type SuppressionRule = Schemas["SuppressionOut"];
 export type CorrelationRule = Schemas["RuleOut"];
 export type SearchOut = Schemas["SearchOut"];
+export type AiRun = Schemas["AiRunOut"];
+export type KnowledgeDoc = Schemas["KnowledgeDocOut"];
+export type KnowledgeDocDetail = Schemas["KnowledgeDocDetail"];
+export type AiSettings = Schemas["AiSettingsOut"];
+export type AiUsage = Schemas["AiUsageOut"];
+
+export function getKnowledgeDocs(): Promise<KnowledgeDoc[] | null> {
+  return optional<KnowledgeDoc[]>("/knowledge/docs");
+}
+
+export function getKnowledgeDoc(id: string): Promise<KnowledgeDocDetail | null> {
+  return isUuid(id) ? optional<KnowledgeDocDetail>(`/knowledge/docs/${id}`) : Promise.resolve(null);
+}
+
+export async function getAiAdmin(): Promise<{ settings: AiSettings; usage: AiUsage } | null> {
+  const [settings, usage] = await Promise.all([optional<AiSettings>("/ai/settings"), optional<AiUsage>("/ai/usage")]);
+  return settings && usage ? { settings, usage } : null;
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -105,16 +123,18 @@ export async function getIncidentDetail(id: string): Promise<{
   alerts: LinkedAlert[];
   timeline: TimelineEntry[];
   tasks: IncidentTask[];
+  aiRuns: AiRun[];
 } | null> {
   if (!isUuid(id)) return null;
   const incident = await optional<IncidentOut>(`/incidents/${id}`);
   if (!incident) return null;
-  const [alerts, timeline, tasks] = await Promise.all([
+  const [alerts, timeline, tasks, aiRuns] = await Promise.all([
     optional<LinkedAlert[]>(`/incidents/${id}/alerts`),
     optional<TimelineEntry[]>(`/incidents/${id}/timeline?limit=500`),
     optional<IncidentTask[]>(`/incidents/${id}/tasks`),
+    optional<AiRun[]>(`/ai/runs?subject_type=incident&subject_id=${id}&limit=5`),
   ]);
-  return { incident, alerts: alerts ?? [], timeline: timeline ?? [], tasks: tasks ?? [] };
+  return { incident, alerts: alerts ?? [], timeline: timeline ?? [], tasks: tasks ?? [], aiRuns: aiRuns ?? [] };
 }
 
 export function getServices(): Promise<ServiceOut[] | null> {

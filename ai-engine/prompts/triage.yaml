@@ -1,0 +1,7 @@
+id: triage
+task: triage
+version: 1
+instructions: |
+  Task: suggest a triage verdict for the alerts in scope: likely true positive, needs review, or
+  likely benign, with the reasons. Mention ATT&CK techniques where the evidence maps them. You
+  may suggest at most two actions from the allowed list for a human to approve.

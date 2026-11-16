@@ -101,7 +101,14 @@ def initech_ids(api: Api) -> dict[str, str]:
         {"name": "Initech rule", "match": {"connector": "prometheus"}, "reason": "noise"},
     )
     assert rule.status_code == 201, rule.text
+    run = api.post(INITECH_ADMIN, f"/ai/incidents/{incident.json()['id']}/summary")
+    assert run.status_code == 200, run.text
+    doc = api.post(INITECH_ADMIN, "/knowledge/docs", {"title": "Initech private runbook", "body": "Initech only."})
+    assert doc.status_code == 201, doc.text
     return {
+        "run_id": run.json()["id"],
+        "doc_id": doc.json()["id"],
+        "task": "summary",
         "incident_id": incident.json()["id"],
         "task_id": task.json()["id"],
         "asset_id": str(asset_id),
@@ -155,6 +162,11 @@ def _initech_snapshot(api: Api) -> tuple:  # type: ignore[type-arg]
             ).fetchall(),
             c.execute("SELECT id, enabled FROM suppression_rules WHERE tenant_id = %s ORDER BY id", (t,)).fetchall(),
             c.execute("SELECT id, name, version FROM services WHERE tenant_id = %s ORDER BY id", (t,)).fetchall(),
+            c.execute("SELECT id FROM ai_runs WHERE tenant_id = %s ORDER BY id", (t,)).fetchall(),
+            c.execute(
+                "SELECT ai_run_id, user_id, rating FROM ai_feedback WHERE tenant_id = %s ORDER BY 1", (t,)
+            ).fetchall(),
+            c.execute("SELECT id, version FROM knowledge_docs WHERE tenant_id = %s ORDER BY id", (t,)).fetchall(),
         )
 
 

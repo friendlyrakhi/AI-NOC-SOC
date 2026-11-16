@@ -1,0 +1,8 @@
+id: alert_summary
+task: alert_summary
+version: 1
+instructions: |
+  Task: summarise one alert for an analyst. Evidence E1 is the alert. Other evidence may include
+  recent alerts on the same asset, the incident it belongs to, and runbook guidance.
+  State what fired, where, how often and its status; relate it to the other evidence; point to
+  runbook guidance if relevant. Three to six claims.

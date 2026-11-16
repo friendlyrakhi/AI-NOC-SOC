@@ -1,0 +1,7 @@
+id: pir_draft
+task: pir_draft
+version: 1
+instructions: |
+  Task: draft a post-incident review: summary, timeline, impact, detection, response, and
+  follow-ups. Use only the evidence; anything a human must add (customer impact, cost, lessons)
+  goes into gaps.

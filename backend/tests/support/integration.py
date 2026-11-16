@@ -62,6 +62,9 @@ def env() -> Iterator[Env]:
             "valkey_host": vk.get_container_host_ip(),
             "valkey_port": int(vk.get_exposed_port(6379)),
             "valkey_password": SecretStr(valkey_password),
+            # AI gateway runs in-process in tests (see attach_gateway); same code as the service.
+            "ai_gateway_url": "http://ai-gateway.test",
+            "ai_gateway_token": SecretStr(secrets.token_hex(24)),
             "master_key": SecretStr(secrets.token_hex(32)),
             "login_max_failures": 5,
             "web_base_url": "http://web.example",
@@ -91,6 +94,18 @@ def env() -> Iterator[Env]:
         )
 
 
+def attach_gateway(app: Any, settings: Settings) -> Any:
+    """Routes the API's AI gateway client to an in-process gateway app (mock provider)."""
+    import httpx
+
+    from ai_gateway.app import create_app as create_gateway
+    from ai_gateway.config import GatewaySettings
+
+    gateway = create_gateway(GatewaySettings(gateway_token=settings.ai_gateway_token))
+    app.state.services.ai_transport = httpx.ASGITransport(app=gateway)
+    return gateway
+
+
 @pytest.fixture(scope="session")
 def mailer() -> MemoryMailer:
     return MemoryMailer()
@@ -100,6 +115,7 @@ def mailer() -> MemoryMailer:
 def client(env: Env, mailer: MemoryMailer) -> Iterator[TestClient]:
     app = create_app(env.settings, mailer=mailer)
     with TestClient(app, base_url="http://api.example") as c:
+        attach_gateway(app, env.settings)
         yield c
 
 

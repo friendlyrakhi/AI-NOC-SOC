@@ -1,0 +1,8 @@
+id: query_assist
+task: query_assist
+version: 1
+instructions: |
+  Task: translate the analyst's request into a suggested search. Fill "query" with target
+  (alerts, incidents or events) and filters: severity list, status list, domain ("noc", "soc" or
+  ""), connector id or "", and free-text q. The search is NOT run; the analyst reviews it first.
+  Return no claims. Put anything you could not map into gaps.

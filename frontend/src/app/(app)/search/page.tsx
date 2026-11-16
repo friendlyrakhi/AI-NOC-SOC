@@ -1,6 +1,8 @@
 import Link from "next/link";
 
+import { ActionForm } from "@/components/action-form";
 import { DemoBadge, SeverityBadge } from "@/components/indicators";
+import { suggestQuery } from "@/app/actions/ai";
 import { gate } from "@/components/page-states";
 import { Card, PageHeader } from "@/components/ui";
 import { getDemo } from "@/lib/server/demo";
@@ -96,6 +98,16 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
   return (
     <>
       <PageHeader title="Search" description="Across incidents, assets, alerts, indicators and vulnerabilities in your current scope." actions={<DemoBadge />} />
+      {has("ai:use") && me.mode !== "aggregate" && (
+        <div className="mb-6 max-w-xl">
+          <ActionForm action={suggestQuery} submitLabel="Suggest a search" className="flex flex-wrap items-end gap-2">
+            <label className="block flex-1">
+              <span className="text-muted text-xs">Describe what you are looking for (AI suggests filters; nothing runs automatically)</span>
+              <input name="intent" maxLength={500} placeholder="e.g. critical security alerts from splunk" className="input mt-1 w-full" />
+            </label>
+          </ActionForm>
+        </div>
+      )}
       <form role="search" className="mb-6 flex max-w-xl gap-2">
         <label htmlFor="search-q" className="sr-only">
           Search terms

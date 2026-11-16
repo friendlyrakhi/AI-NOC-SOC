@@ -48,7 +48,7 @@ class ServiceOut(BaseModel):
     sandbox: bool
 
 
-class AssetBrief(BaseModel):
+class ServiceAssetOut(BaseModel):
     id: UUID
     name: str
     type: str
@@ -58,7 +58,7 @@ class AssetBrief(BaseModel):
 
 
 class ServiceDetail(ServiceOut):
-    assets: list[AssetBrief]
+    assets: list[ServiceAssetOut]
 
 
 _SERVICE_SELECT = """
@@ -114,7 +114,9 @@ async def get_service(service_id: UUID, services: Svc, p: P) -> ServiceDetail:
             {"id": service_id},
         )
         return ServiceDetail(
-            **row._mapping, health=_health(row.worst_open_severity), assets=[AssetBrief(**a._mapping) for a in assets]
+            **row._mapping,
+            health=_health(row.worst_open_severity),
+            assets=[ServiceAssetOut(**a._mapping) for a in assets],
         )
 
 

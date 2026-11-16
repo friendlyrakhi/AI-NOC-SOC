@@ -58,6 +58,8 @@ PERMISSIONS: dict[str, str] = {
     "vuln:update": "Update vulnerability findings",
     "ai:use": "Use AI assistance",
     "ai:admin": "Configure AI settings",
+    "knowledge:read": "Read runbooks and the knowledge base",
+    "knowledge:publish": "Publish runbooks used as AI evidence",
     "action:read": "View actions",
     "action:request": "Request actions",
     "action:approve": "Approve or deny actions",
@@ -89,6 +91,7 @@ PRIVILEGED: frozenset[str] = frozenset(
         "correlation:manage",
         "sla:manage",
         "ai:admin",
+        "knowledge:publish",
         "action:approve",
         "playbook:publish",
         "automation:killswitch",
@@ -99,7 +102,7 @@ MSP_ONLY: frozenset[str] = frozenset({"msp:customers:read", "msp:customers:manag
 
 # Admin portal visibility: any of these.
 ADMIN_PORTAL_ANY: frozenset[str] = frozenset(
-    {"tenant:read", "user:read", "role:read", "apikey:read", "audit:read", "delegation:read"}
+    {"tenant:read", "user:read", "role:read", "apikey:read", "audit:read", "delegation:read", "ai:admin"}
 )
 
 _NOC_READ = {
@@ -111,8 +114,18 @@ _NOC_READ = {
     "maintenance:read",
     "search:read",
     "ai:use",
+    "knowledge:read",
 }
-_SOC_READ = {"portal:soc", "alert:read", "incident:read", "asset:read", "service:read", "search:read", "ai:use"}
+_SOC_READ = {
+    "portal:soc",
+    "alert:read",
+    "incident:read",
+    "asset:read",
+    "service:read",
+    "search:read",
+    "ai:use",
+    "knowledge:read",
+}
 
 
 @dataclass(frozen=True)

@@ -1,0 +1,33 @@
+# OPT-IN ONLY. Gives the AI gateway internet egress so it can call a cloud model (Anthropic).
+# Not used by scripts/dev.ps1 or CI. Three independent switches must all be on before any
+# evidence leaves the PC:
+#   1. this override (network egress for the gateway container),
+#   2. NOCSOC_AI_CLOUD_EGRESS_ENABLED=true plus an API key secret (gateway setting),
+#   3. the tenant's AI settings: provider "anthropic" with "allow cloud" (admin + step-up).
+# Evidence is redacted (secrets always; personal data unless the tenant turns that off) and
+# only the model call leaves: the gateway still has no route to data stores or the runner.
+#
+# Usage:
+#   1. Put your key in infrastructure/secrets/anthropic_api_key (git-ignored; never commit it).
+#   2. docker compose -f infrastructure/compose/docker-compose.yml \
+#        -f infrastructure/compose/ai-egress.override.yml --env-file .env --profile core \
+#        --profile stream --profile ai up -d
+#   3. Run the eval harness against the real provider and record the baseline first:
+#        uv run python ai-engine/evals/harness.py --provider anthropic --write
+services:
+  ai-gateway:
+    networks: [ai, ai_egress]
+    environment:
+      NOCSOC_AI_CLOUD_EGRESS_ENABLED: "true"
+    secrets:
+      - source: ai_gateway_token
+        target: nocsoc_ai_gateway_token
+      - source: anthropic_api_key
+        target: nocsoc_ai_anthropic_api_key
+
+secrets:
+  anthropic_api_key:
+    file: ../secrets/anthropic_api_key
+
+networks:
+  ai_egress: {}

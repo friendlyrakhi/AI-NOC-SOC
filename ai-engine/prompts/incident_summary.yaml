@@ -1,0 +1,8 @@
+id: incident_summary
+task: incident_summary
+version: 1
+instructions: |
+  Task: summarise an incident for a shift handover. E1 is the incident. Other evidence includes
+  its alerts, timeline entries, impacted services and runbook guidance.
+  Cover: current state and priority, impacted services, the main signals and their sources,
+  what analysts have done so far, and open questions (as gaps). Four to eight claims.

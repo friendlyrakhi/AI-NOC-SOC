@@ -7,6 +7,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import __version__, errors
+from app.ai.knowledge import router as knowledge_router
+from app.ai.router import router as ai_router
 from app.alerts.router import router as alerts_router
 from app.config import Settings, get_settings
 from app.core.identity.router import router as auth_router
@@ -68,6 +70,8 @@ def create_app(settings: Settings | None = None, *, mailer: Mailer | None = None
         incidents_router,
         topology_router,
         live_router,
+        ai_router,
+        knowledge_router,
         events_router,
         internal_router,
     ):

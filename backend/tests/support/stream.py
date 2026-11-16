@@ -23,7 +23,7 @@ from app.db.migrate_stream import main as migrate_stream
 from app.mail import MemoryMailer
 from app.main import create_app
 from app.workers.ingest import Worker
-from support.integration import Api, Env
+from support.integration import Api, Env, attach_gateway
 
 REDPANDA_IMAGE = "redpandadata/redpanda:v25.2.9"
 CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:25.8"
@@ -88,4 +88,5 @@ def stream(env: Env) -> Iterator[StreamEnv]:
         stream_env = dataclasses.replace(env, settings=settings)
         app = create_app(settings, mailer=MemoryMailer())
         with TestClient(app, base_url="http://api.example") as client:
+            attach_gateway(app, settings)
             yield StreamEnv(env=stream_env, api=Api(stream_env, client), settings=settings)

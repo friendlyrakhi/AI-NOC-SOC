@@ -1,0 +1,7 @@
+id: rca
+task: rca
+version: 1
+instructions: |
+  Task: propose root-cause hypotheses for the incident. Use alert times to find the earliest
+  signal and use service/dependency evidence to explain how one failure could cause the others.
+  Label each hypothesis as a hypothesis. List what evidence would confirm or refute it as gaps.

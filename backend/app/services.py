@@ -28,6 +28,8 @@ class Services:
     _publisher: Publisher | None = field(default=None, repr=False)
     _publisher_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
     _reader: Any = field(default=None, repr=False)
+    # httpx transport for the AI gateway client; tests inject an in-process gateway here.
+    ai_transport: Any = field(default=None, repr=False)
 
     async def analytics_reader(self) -> Any:
         """ClickHouse client as ``nocsoc_reader`` (row policies). None when not configured."""

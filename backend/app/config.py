@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     clickhouse_admin_password: SecretStr | None = None
     clickhouse_ingest_password: SecretStr | None = None
     clickhouse_reader_password: SecretStr | None = None
+    # --- AI gateway (P4). Optional: AI endpoints return 503 without it.
+    ai_gateway_url: str | None = None
+    ai_gateway_token: SecretStr | None = None
+    ai_request_timeout_seconds: float = Field(default=90.0, gt=0, le=600)
     # Shared token the connector-runner presents on internal endpoints.
     runner_token: SecretStr | None = None
     webhook_max_bytes: int = Field(default=1_048_576, ge=1024, le=10_485_760)

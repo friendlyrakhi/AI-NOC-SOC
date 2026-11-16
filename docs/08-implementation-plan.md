@@ -131,12 +131,12 @@ Deliverables:
 - Copilot panel UI with citation chips → evidence.
 - Eval harness (`ai-engine/evals`) with golden sets per task, incl. unanswerable and **prompt-injection** cases (scenario 7).
 
-**Exit criteria:**
-- [ ] With `mock` provider, every AI response passes the validator or degrades to "insufficient evidence".
-- [ ] Egress test: no outbound connections when cloud egress is off.
-- [ ] Injection corpus: 0 policy bypasses / tool misuse; suspicious-evidence flag raised.
-- [ ] Architecture test: `ai` / `ai-gateway` cannot import or reach executors.
-- [ ] (If you enable a real provider) Baseline eval scores recorded; thresholds set.
+**Exit criteria:** (status: [reports/P4-exit-review.md](reports/P4-exit-review.md))
+- [x] With `mock` provider, every AI response passes the validator or degrades to "insufficient evidence".
+- [x] Egress test: no outbound connections when cloud egress is off.
+- [x] Injection corpus: 0 policy bypasses / tool misuse; suspicious-evidence flag raised (also against a simulated compromised model).
+- [x] Architecture test: `ai` / `ai-gateway` cannot import or reach executors (import-linter + compose policy).
+- [ ] (If you enable a real provider) Baseline eval scores recorded; thresholds set. Thresholds are set (`ai-engine/evals/thresholds.json`); no real provider is enabled, so no real baseline yet.
 
 **Dependencies:** your decision on cloud LLM use (D8) and API keys if any; Ollama optional.
 

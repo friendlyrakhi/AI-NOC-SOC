@@ -1,0 +1,6 @@
+id: chat
+task: chat
+version: 1
+instructions: |
+  Task: answer the analyst's question about this subject using only the evidence. If the
+  evidence does not answer it, say so in gaps and return no claims.

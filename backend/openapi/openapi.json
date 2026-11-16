@@ -150,6 +150,404 @@
         "title": "AggregateCustomerOut",
         "type": "object"
       },
+      "AiChatIn": {
+        "properties": {
+          "question": {
+            "maxLength": 2000,
+            "minLength": 2,
+            "title": "Question",
+            "type": "string"
+          },
+          "subject_id": {
+            "format": "uuid",
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "subject_type": {
+            "enum": [
+              "alert",
+              "incident"
+            ],
+            "title": "Subject Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_type",
+          "subject_id",
+          "question"
+        ],
+        "title": "AiChatIn",
+        "type": "object"
+      },
+      "AiEvidenceRef": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "suspicious": {
+            "title": "Suspicious",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "type",
+          "id",
+          "title",
+          "suspicious"
+        ],
+        "title": "AiEvidenceRef",
+        "type": "object"
+      },
+      "AiFeedbackIn": {
+        "properties": {
+          "comment": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Comment",
+            "type": "string"
+          },
+          "rating": {
+            "enum": [
+              -1,
+              1
+            ],
+            "title": "Rating",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rating"
+        ],
+        "title": "AiFeedbackIn",
+        "type": "object"
+      },
+      "AiQueryAssistIn": {
+        "properties": {
+          "intent": {
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Intent",
+            "type": "string"
+          }
+        },
+        "required": [
+          "intent"
+        ],
+        "title": "AiQueryAssistIn",
+        "type": "object"
+      },
+      "AiRunOut": {
+        "properties": {
+          "ai_generated": {
+            "default": true,
+            "title": "Ai Generated",
+            "type": "boolean"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/AiEvidenceRef"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "latency_ms": {
+            "title": "Latency Ms",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "my_rating": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "My Rating"
+          },
+          "output": {
+            "additionalProperties": true,
+            "title": "Output",
+            "type": "object"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question"
+          },
+          "redactions": {
+            "title": "Redactions",
+            "type": "integer"
+          },
+          "subject_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Id"
+          },
+          "subject_type": {
+            "title": "Subject Type",
+            "type": "string"
+          },
+          "suspicious_count": {
+            "title": "Suspicious Count",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "template": {
+            "title": "Template",
+            "type": "string"
+          },
+          "tokens_in": {
+            "title": "Tokens In",
+            "type": "integer"
+          },
+          "tokens_out": {
+            "title": "Tokens Out",
+            "type": "integer"
+          },
+          "validation_notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Validation Notes",
+            "type": "array"
+          },
+          "validation_status": {
+            "enum": [
+              "grounded",
+              "partially_grounded",
+              "insufficient_evidence",
+              "rejected"
+            ],
+            "title": "Validation Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "task",
+          "subject_type",
+          "subject_id",
+          "provider",
+          "model",
+          "template",
+          "question",
+          "evidence",
+          "output",
+          "validation_status",
+          "validation_notes",
+          "confidence",
+          "suspicious_count",
+          "tokens_in",
+          "tokens_out",
+          "latency_ms",
+          "redactions",
+          "created_at"
+        ],
+        "title": "AiRunOut",
+        "type": "object"
+      },
+      "AiSettingsIn": {
+        "properties": {
+          "allow_cloud": {
+            "default": false,
+            "title": "Allow Cloud",
+            "type": "boolean"
+          },
+          "auto_summarize": {
+            "default": false,
+            "title": "Auto Summarize",
+            "type": "boolean"
+          },
+          "daily_token_budget": {
+            "default": 200000,
+            "maximum": 100000000.0,
+            "minimum": 0.0,
+            "title": "Daily Token Budget",
+            "type": "integer"
+          },
+          "provider": {
+            "enum": [
+              "mock",
+              "ollama",
+              "anthropic"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "redact_pii": {
+            "default": true,
+            "title": "Redact Pii",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "provider"
+        ],
+        "title": "AiSettingsIn",
+        "type": "object"
+      },
+      "AiSettingsOut": {
+        "properties": {
+          "allow_cloud": {
+            "title": "Allow Cloud",
+            "type": "boolean"
+          },
+          "auto_summarize": {
+            "title": "Auto Summarize",
+            "type": "boolean"
+          },
+          "daily_token_budget": {
+            "title": "Daily Token Budget",
+            "type": "integer"
+          },
+          "gateway_reachable": {
+            "title": "Gateway Reachable",
+            "type": "boolean"
+          },
+          "provider": {
+            "enum": [
+              "mock",
+              "ollama",
+              "anthropic"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "providers_available": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Providers Available",
+            "type": "object"
+          },
+          "redact_pii": {
+            "title": "Redact Pii",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "provider",
+          "allow_cloud",
+          "redact_pii",
+          "daily_token_budget",
+          "auto_summarize",
+          "providers_available",
+          "gateway_reachable"
+        ],
+        "title": "AiSettingsOut",
+        "type": "object"
+      },
+      "AiUsageOut": {
+        "properties": {
+          "by_provider": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Provider",
+            "type": "object"
+          },
+          "by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Status",
+            "type": "object"
+          },
+          "by_task": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Task",
+            "type": "object"
+          },
+          "daily_token_budget": {
+            "title": "Daily Token Budget",
+            "type": "integer"
+          },
+          "feedback_down": {
+            "title": "Feedback Down",
+            "type": "integer"
+          },
+          "feedback_up": {
+            "title": "Feedback Up",
+            "type": "integer"
+          },
+          "runs_30d": {
+            "title": "Runs 30D",
+            "type": "integer"
+          },
+          "tokens_today": {
+            "title": "Tokens Today",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tokens_today",
+          "daily_token_budget",
+          "runs_30d",
+          "by_task",
+          "by_status",
+          "by_provider",
+          "feedback_up",
+          "feedback_down"
+        ],
+        "title": "AiUsageOut",
+        "type": "object"
+      },
       "AlertLinks": {
         "properties": {
           "alert_ids": {
@@ -174,7 +572,7 @@
           "asset": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/app__alerts__router__AssetBrief"
+                "$ref": "#/components/schemas/AssetBrief"
               },
               {
                 "type": "null"
@@ -448,7 +846,7 @@
             "items": {
               "type": "string"
             },
-            "maxItems": 57,
+            "maxItems": 59,
             "minItems": 1,
             "title": "Permissions",
             "type": "array"
@@ -605,6 +1003,30 @@
           "created_at"
         ],
         "title": "ApiKeyOut",
+        "type": "object"
+      },
+      "AssetBrief": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type"
+        ],
+        "title": "AssetBrief",
         "type": "object"
       },
       "AssetDetail": {
@@ -2632,6 +3054,177 @@
         "title": "InviteResponse",
         "type": "object"
       },
+      "KnowledgeDocDetail": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "chunks": {
+            "title": "Chunks",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "runbook",
+              "kb",
+              "postmortem"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "source",
+          "version",
+          "chunks",
+          "updated_at",
+          "body"
+        ],
+        "title": "KnowledgeDocDetail",
+        "type": "object"
+      },
+      "KnowledgeDocIn": {
+        "properties": {
+          "body": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "kind": {
+            "default": "runbook",
+            "enum": [
+              "runbook",
+              "kb",
+              "postmortem"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "body"
+        ],
+        "title": "KnowledgeDocIn",
+        "type": "object"
+      },
+      "KnowledgeDocOut": {
+        "properties": {
+          "chunks": {
+            "title": "Chunks",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "runbook",
+              "kb",
+              "postmortem"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "source",
+          "version",
+          "chunks",
+          "updated_at"
+        ],
+        "title": "KnowledgeDocOut",
+        "type": "object"
+      },
+      "KnowledgeHit": {
+        "properties": {
+          "doc_id": {
+            "format": "uuid",
+            "title": "Doc Id",
+            "type": "string"
+          },
+          "excerpt": {
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "doc_id",
+          "title",
+          "kind",
+          "excerpt",
+          "score"
+        ],
+        "title": "KnowledgeHit",
+        "type": "object"
+      },
       "LinkedAlert": {
         "properties": {
           "added_by": {
@@ -3460,7 +4053,7 @@
             "items": {
               "type": "string"
             },
-            "maxItems": 57,
+            "maxItems": 59,
             "title": "Permissions",
             "type": "array"
           }
@@ -3548,7 +4141,7 @@
                 "items": {
                   "type": "string"
                 },
-                "maxItems": 57,
+                "maxItems": 59,
                 "type": "array"
               },
               {
@@ -3952,6 +4545,56 @@
         "title": "SearchOut",
         "type": "object"
       },
+      "ServiceAssetOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "open_alerts": {
+            "title": "Open Alerts",
+            "type": "integer"
+          },
+          "role": {
+            "enum": [
+              "member",
+              "dependency"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "worst_open_severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worst Open Severity"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "role",
+          "open_alerts",
+          "worst_open_severity"
+        ],
+        "title": "ServiceAssetOut",
+        "type": "object"
+      },
       "ServiceBrief": {
         "properties": {
           "id": {
@@ -3982,7 +4625,7 @@
           },
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/app__topology__AssetBrief"
+              "$ref": "#/components/schemas/ServiceAssetOut"
             },
             "title": "Assets",
             "type": "array"
@@ -5043,7 +5686,7 @@
           "asset": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/app__alerts__router__AssetBrief"
+                "$ref": "#/components/schemas/AssetBrief"
               },
               {
                 "type": "null"
@@ -5272,80 +5915,6 @@
         ],
         "title": "WorkItem",
         "type": "object"
-      },
-      "app__alerts__router__AssetBrief": {
-        "properties": {
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "type": {
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "type"
-        ],
-        "title": "AssetBrief",
-        "type": "object"
-      },
-      "app__topology__AssetBrief": {
-        "properties": {
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "open_alerts": {
-            "title": "Open Alerts",
-            "type": "integer"
-          },
-          "role": {
-            "enum": [
-              "member",
-              "dependency"
-            ],
-            "title": "Role",
-            "type": "string"
-          },
-          "type": {
-            "title": "Type",
-            "type": "string"
-          },
-          "worst_open_severity": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Worst Open Severity"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "type",
-          "role",
-          "open_alerts",
-          "worst_open_severity"
-        ],
-        "title": "AssetBrief",
-        "type": "object"
       }
     }
   },
@@ -5432,6 +6001,477 @@
         ],
         "x-aggregate": true,
         "x-required-permission": "msp:aggregate_read",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/ai/alerts/{alert_id}/summary": {
+      "post": {
+        "operationId": "alert_summary_api_v1_ai_alerts__alert_id__summary_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "alert_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Alert Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Alert Summary",
+        "tags": [
+          "ai"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "ai:use",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/ai/chat": {
+      "post": {
+        "operationId": "chat_api_v1_ai_chat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiChatIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Chat",
+        "tags": [
+          "ai"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "ai:use",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/ai/incidents/{incident_id}/{task}": {
+      "post": {
+        "operationId": "incident_task_api_v1_ai_incidents__incident_id___task__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "task",
+            "required": true,
+            "schema": {
+              "enum": [
+                "summary",
+                "triage",
+                "rca",
+                "pir-draft"
+              ],
+              "title": "Task",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Incident Task",
+        "tags": [
+          "ai"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "ai:use",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/ai/query-assist": {
+      "post": {
+        "description": "Returns a *suggested* search. It is never executed here; the analyst runs it.",
+        "operationId": "query_assist_api_v1_ai_query_assist_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiQueryAssistIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Query Assist",
+        "tags": [
+          "ai"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "ai:use",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/ai/runs": {
+      "get": {
+        "operationId": "list_runs_api_v1_ai_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "subject_type",
+            "required": true,
+            "schema": {
+              "enum": [
+                "alert",
+                "incident",
+                "none"
+              ],
+              "title": "Subject Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Subject Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AiRunOut"
+                  },
+                  "title": "Response List Runs Api V1 Ai Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Runs",
+        "tags": [
+          "ai"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "ai:use",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/ai/runs/{run_id}": {
+      "get": {
+        "operationId": "get_run_api_v1_ai_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run",
+        "tags": [
+          "ai"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "ai:use",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/ai/runs/{run_id}/feedback": {
+      "post": {
+        "operationId": "feedback_api_v1_ai_runs__run_id__feedback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiFeedbackIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Feedback",
+        "tags": [
+          "ai"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "ai:use",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/ai/settings": {
+      "get": {
+        "operationId": "get_settings_api_v1_ai_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Settings",
+        "tags": [
+          "ai"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "ai:admin",
+        "x-step-up": false
+      },
+      "put": {
+        "operationId": "put_settings_api_v1_ai_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiSettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Settings",
+        "tags": [
+          "ai"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "ai:admin",
+        "x-step-up": true
+      }
+    },
+    "/api/v1/ai/usage": {
+      "get": {
+        "operationId": "usage_api_v1_ai_usage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiUsageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Usage",
+        "tags": [
+          "ai"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "ai:admin",
         "x-step-up": false
       }
     },
@@ -9055,6 +10095,210 @@
           "internal"
         ],
         "x-required-permission": "internal"
+      }
+    },
+    "/api/v1/knowledge/docs": {
+      "get": {
+        "operationId": "list_docs_api_v1_knowledge_docs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/KnowledgeDocOut"
+                  },
+                  "title": "Response List Docs Api V1 Knowledge Docs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Docs",
+        "tags": [
+          "knowledge"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "knowledge:read",
+        "x-step-up": false
+      },
+      "post": {
+        "operationId": "publish_doc_api_v1_knowledge_docs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeDocIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeDocOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Doc",
+        "tags": [
+          "knowledge"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "knowledge:publish",
+        "x-step-up": true
+      }
+    },
+    "/api/v1/knowledge/docs/{doc_id}": {
+      "delete": {
+        "operationId": "delete_doc_api_v1_knowledge_docs__doc_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doc_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Doc Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Doc",
+        "tags": [
+          "knowledge"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "knowledge:publish",
+        "x-step-up": true
+      },
+      "get": {
+        "operationId": "get_doc_api_v1_knowledge_docs__doc_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doc_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Doc Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeDocDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Doc",
+        "tags": [
+          "knowledge"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "knowledge:read",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/knowledge/search": {
+      "get": {
+        "operationId": "search_api_v1_knowledge_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 500,
+              "minLength": 2,
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/KnowledgeHit"
+                  },
+                  "title": "Response Search Api V1 Knowledge Search Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search",
+        "tags": [
+          "knowledge"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "knowledge:read",
+        "x-step-up": false
       }
     },
     "/api/v1/maintenance-windows": {

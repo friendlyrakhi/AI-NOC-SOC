@@ -51,3 +51,39 @@ def test_unsafe_service_rejected(override: dict[str, object], expected: str) -> 
     svc = {**SAFE, **override}
     problems = check({"services": {"bad": svc}})
     assert any(expected in p for p in problems), problems
+
+
+# ---------------------------------------------------------------- AI gateway isolation (LLM06, T21)
+check_ai = _load().check_ai_isolation
+
+GATEWAY = {
+    "networks": {"ai": None},
+    "environment": {"NOCSOC_AI_CLOUD_EGRESS_ENABLED": "false"},
+    "secrets": [{"source": "ai_gateway_token"}],
+}
+AI_NETS = {"ai": {"internal": True}}
+
+
+def test_isolated_gateway_passes() -> None:
+    config = {"services": {"ai-gateway": GATEWAY, "api": {"networks": {"ai": None, "data": None}}}, "networks": AI_NETS}
+    assert check_ai(config) == []
+
+
+@pytest.mark.parametrize(
+    ("services", "networks", "expected"),
+    [
+        ({"ai-gateway": {**GATEWAY, "networks": {"ai": None, "bus": None}}}, AI_NETS, "only to network 'ai'"),
+        ({"ai-gateway": GATEWAY}, {"ai": {}}, "must be internal"),
+        ({"ai-gateway": GATEWAY, "connector-runner": {"networks": {"ai": None}}}, AI_NETS, "must not join"),
+        ({"ai-gateway": {**GATEWAY, "secrets": [{"source": "database_password"}]}}, AI_NETS, "unexpected secret"),
+        ({"ai-gateway": {**GATEWAY, "environment": {"NOCSOC_RUNNER_TOKEN": "x"}}}, AI_NETS, "platform setting"),
+        (
+            {"ai-gateway": {**GATEWAY, "environment": {"NOCSOC_AI_CLOUD_EGRESS_ENABLED": "true"}}},
+            AI_NETS,
+            "egress must be off",
+        ),
+    ],
+)
+def test_unsafe_gateway_rejected(services: dict[str, object], networks: dict[str, object], expected: str) -> None:
+    problems = check_ai({"services": services, "networks": networks})
+    assert any(expected in p for p in problems), problems

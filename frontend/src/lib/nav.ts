@@ -80,6 +80,7 @@ export const OPERATIONS_SECTION: NavSection = {
     { label: "Incidents", href: "/incidents", perm: "incident:read" },
     { label: "Automation", href: "/automation", perm: "playbook:read" },
     { label: "Connectors", href: "/connectors", perm: "connector:read" },
+    { label: "Knowledge base", href: "/knowledge", perm: "knowledge:read" },
     { label: "Reports", href: "/reports", perm: "report:read" },
   ],
 };
@@ -95,6 +96,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { label: "Members", href: "/admin/users", anyOf: ["user:read"] },
   { label: "Roles", href: "/admin/roles", anyOf: ["role:read"] },
   { label: "API keys", href: "/admin/api-keys", anyOf: ["apikey:read"] },
+  { label: "AI settings", href: "/admin/ai", anyOf: ["ai:admin"] },
   { label: "Audit log", href: "/admin/audit", anyOf: ["audit:read"] },
   { label: "Delegations", href: "/admin/delegations", anyOf: ["delegation:read"] },
   { label: "Customers", href: "/admin/customers", anyOf: ["msp:customers:read"], mspOnly: true },

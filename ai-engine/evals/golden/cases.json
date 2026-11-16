@@ -1,0 +1,94 @@
+{
+  "description": "Golden cases per task, in the API's evidence shape. 'must_cite' lists refs a good answer cites (recall); 'expect' is the expected validation status; 'unanswerable' cases must degrade to insufficient_evidence.",
+  "cases": [
+    {
+      "name": "alert_summary/core-switch",
+      "task": "alert_summary",
+      "evidence": [
+        {"ref": "E1", "type": "alert", "id": "a1", "title": "Node is down", "severity": "critical", "at": "2026-11-16T10:00:00Z", "attributes": {"asset": "core-sw-01", "connector": "solarwinds.orion", "domain": "noc", "status": "new", "occurrences": 1}},
+        {"ref": "E2", "type": "alert", "id": "a2", "title": "Interface Gi1/0/48 down", "severity": "medium", "at": "2026-11-16T10:00:10Z", "attributes": {"asset": "core-sw-01", "connector": "solarwinds.orion", "domain": "noc"}},
+        {"ref": "E3", "type": "incident", "id": "i1", "title": "INC-000001 Node is down", "attributes": {"number": "INC-000001", "status": "open", "priority": "P1", "domain": "noc"}},
+        {"ref": "E4", "type": "runbook", "id": "k1", "title": "Core network outage (switch or distribution layer down)", "text": "Check power, uplinks and the redundant peer."}
+      ],
+      "expect": "grounded",
+      "must_cite": ["E1", "E3", "E4"]
+    },
+    {
+      "name": "incident_summary/joint-ransomware",
+      "task": "incident_summary",
+      "evidence": [
+        {"ref": "E1", "type": "incident", "id": "i2", "title": "INC-000002 Shadow copy deletion", "severity": "critical", "attributes": {"number": "INC-000002", "status": "investigating", "priority": "P1", "domain": "joint", "services": ["File Services"]}},
+        {"ref": "E2", "type": "alert", "id": "b1", "title": "Shadow copy deletion", "severity": "critical", "at": "2026-11-16T09:00:00Z", "attributes": {"asset": "win-01", "connector": "crowdstrike.falcon", "domain": "soc", "mitre": ["T1490"]}},
+        {"ref": "E3", "type": "alert", "id": "b2", "title": "Encoded PowerShell from Office macro", "severity": "high", "at": "2026-11-16T08:58:00Z", "attributes": {"asset": "win-01", "connector": "crowdstrike.falcon", "domain": "soc", "mitre": ["T1059.001"]}},
+        {"ref": "E4", "type": "alert", "id": "b3", "title": "File share latency above 2 s on fileserver", "severity": "high", "at": "2026-11-16T09:02:00Z", "attributes": {"asset": "win-01", "connector": "datadog", "domain": "noc"}},
+        {"ref": "E5", "type": "timeline", "id": "t1", "title": "Analyst comment", "text": "Host owner contacted.", "at": "2026-11-16T09:10:00Z", "attributes": {"kind": "comment"}}
+      ],
+      "expect": "grounded",
+      "must_cite": ["E1", "E2", "E4"]
+    },
+    {
+      "name": "triage/edr",
+      "task": "triage",
+      "allowed_actions": ["edr.isolate_host", "edr.release_host"],
+      "evidence": [
+        {"ref": "E1", "type": "alert", "id": "c1", "title": "Encoded PowerShell from Office macro", "severity": "high", "attributes": {"asset": "win-01", "connector": "crowdstrike.falcon", "domain": "soc", "mitre": ["T1059.001"]}}
+      ],
+      "expect": "grounded",
+      "must_cite": ["E1"],
+      "max_actions": 2
+    },
+    {
+      "name": "rca/core-switch",
+      "task": "rca",
+      "evidence": [
+        {"ref": "E1", "type": "incident", "id": "i1", "title": "INC-000001", "attributes": {"number": "INC-000001", "status": "open", "priority": "P1", "domain": "noc"}},
+        {"ref": "E2", "type": "alert", "id": "a1", "title": "Node is down", "severity": "critical", "at": "2026-11-16T10:00:00Z", "attributes": {"asset": "core-sw-01", "connector": "solarwinds.orion", "domain": "noc"}},
+        {"ref": "E3", "type": "alert", "id": "a3", "title": "TargetDown lnx-01", "severity": "critical", "at": "2026-11-16T10:01:00Z", "attributes": {"asset": "lnx-01", "connector": "prometheus", "domain": "noc"}},
+        {"ref": "E4", "type": "service", "id": "s1", "title": "Payments", "attributes": {"dependencies": ["core-sw-01"], "members": ["lnx-01"]}}
+      ],
+      "expect": "grounded",
+      "must_cite": ["E2", "E4"]
+    },
+    {
+      "name": "pir/core-switch",
+      "task": "pir_draft",
+      "evidence": [
+        {"ref": "E1", "type": "incident", "id": "i1", "title": "INC-000001", "attributes": {"number": "INC-000001", "status": "resolved", "priority": "P1", "domain": "noc", "services": ["Payments"]}},
+        {"ref": "E2", "type": "alert", "id": "a1", "title": "Node is down", "severity": "critical", "at": "2026-11-16T10:00:00Z", "attributes": {"asset": "core-sw-01", "connector": "solarwinds.orion", "domain": "noc"}},
+        {"ref": "E3", "type": "timeline", "id": "t1", "title": "Status open -> investigating", "at": "2026-11-16T10:05:00Z", "attributes": {"kind": "state_change"}},
+        {"ref": "E4", "type": "timeline", "id": "t2", "title": "Status investigating -> resolved", "at": "2026-11-16T11:30:00Z", "attributes": {"kind": "state_change"}}
+      ],
+      "expect": "grounded",
+      "must_cite": ["E1", "E3", "E4"]
+    },
+    {
+      "name": "query_assist/critical-splunk",
+      "task": "query_assist",
+      "question": "critical security alerts from splunk",
+      "evidence": [],
+      "expect": "grounded",
+      "expect_query": {"severity": ["critical"], "domain": "soc", "connector": "splunk"}
+    },
+    {
+      "name": "chat/answerable",
+      "task": "chat",
+      "question": "what happened on win-01",
+      "evidence": [
+        {"ref": "E1", "type": "alert", "id": "b1", "title": "Shadow copy deletion", "severity": "critical", "attributes": {"asset": "win-01", "connector": "crowdstrike.falcon", "domain": "soc"}}
+      ],
+      "expect": "grounded",
+      "must_cite": ["E1"]
+    },
+    {
+      "name": "chat/unanswerable",
+      "task": "chat",
+      "question": "what is the finance director's salary",
+      "evidence": [{"ref": "E1", "type": "alert", "id": "b1", "title": "Shadow copy deletion", "severity": "critical", "attributes": {"asset": "win-01"}}],
+      "expect": "insufficient_evidence",
+      "unanswerable": true
+    },
+    {"name": "alert_summary/no-evidence", "task": "alert_summary", "evidence": [], "expect": "insufficient_evidence", "unanswerable": true},
+    {"name": "rca/untimed", "task": "rca", "evidence": [{"ref": "E1", "type": "incident", "id": "i9", "title": "INC-000009", "attributes": {"number": "INC-000009"}}], "expect": "insufficient_evidence", "unanswerable": true},
+    {"name": "triage/no-alerts", "task": "triage", "evidence": [], "expect": "insufficient_evidence", "unanswerable": true}
+  ]
+}

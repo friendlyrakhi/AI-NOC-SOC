@@ -13,6 +13,7 @@ import json
 import secrets
 import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from sqlalchemy import Connection, create_engine, text
 
@@ -245,11 +246,55 @@ def seed_demo_integrations(settings: Settings) -> int:
     return created
 
 
+RUNBOOKS_DIR = Path(__file__).resolve().parents[1] / "ai" / "runbooks"
+
+
+def seed_demo_knowledge(settings: Settings) -> int:
+    """Idempotent: loads the bundled DEMO runbooks into each demo tenant's knowledge base.
+
+    Only documents are inserted; the API embeds them on first use through the AI gateway, so
+    there is exactly one embedding implementation.
+    """
+    if settings.environment != "dev":
+        raise SystemExit("seeding is only allowed in the dev environment")
+    docs = []
+    for path in sorted(RUNBOOKS_DIR.glob("*.md")):
+        body = path.read_text(encoding="utf-8").strip()
+        title = body.splitlines()[0].lstrip("# ").strip()
+        docs.append((title, body))
+    engine = create_engine(settings.superuser_database_url())
+    created = 0
+    try:
+        with engine.begin() as conn:
+            for slug in DEMO_INTEGRATIONS:
+                tid = conn.execute(text("SELECT id FROM tenants WHERE slug = :s"), {"s": slug}).scalar_one_or_none()
+                if tid is None:
+                    continue
+                for title, body in docs:
+                    result = conn.execute(
+                        text(
+                            "INSERT INTO knowledge_docs (tenant_id, kind, title, body, source) "
+                            "VALUES (:t, 'runbook', :ti, :b, 'seed (DEMO)') ON CONFLICT (tenant_id, title) DO NOTHING"
+                        ),
+                        {"t": tid, "ti": title, "b": body},
+                    )
+                    created += result.rowcount
+    finally:
+        engine.dispose()
+    return created
+
+
 if __name__ == "__main__":
     settings = get_settings()
     result = seed(settings)
     integrations = seed_demo_integrations(settings)
+    runbooks = seed_demo_knowledge(settings)
     if result is None:
-        print(json.dumps({"status": "already_seeded", "demo_integrations_created": integrations}))
+        print(json.dumps({"status": "already_seeded", "demo_integrations_created": integrations, "runbooks": runbooks}))
         sys.exit(0)
-    print(json.dumps({"status": "seeded", "users": result, "demo_integrations_created": integrations}, indent=2))
+    print(
+        json.dumps(
+            {"status": "seeded", "users": result, "demo_integrations_created": integrations, "runbooks": runbooks},
+            indent=2,
+        )
+    )

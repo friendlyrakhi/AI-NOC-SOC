@@ -46,6 +46,7 @@ def check(config: dict) -> list[str]:
         if not svc.get("mem_limit") and not svc.get("deploy", {}).get("resources", {}).get("limits", {}).get("memory"):
             problems.append(f"{name}: no memory limit")
     problems += check_isolation(config)
+    problems += check_ai_isolation(config)
     return problems
 
 
@@ -75,6 +76,36 @@ def check_isolation(config: dict) -> list[str]:
             source = str(secret.get("source", ""))
             if any(s in source for s in ("database", "clickhouse", "valkey", "postgres", "master_key")):
                 problems.append(f"{runtime}: has data-store secret {secret.get('source')}")
+    return problems
+
+
+# The AI gateway may talk to the API only (LLM06, T21): one internal network, one secret.
+AI_RUNTIMES = {"ai-gateway"}
+AI_ALLOWED_SECRETS = {"ai_gateway_token", "anthropic_api_key"}
+
+
+def check_ai_isolation(config: dict) -> list[str]:
+    services = config.get("services", {})
+    networks = config.get("networks", {})
+    problems = []
+    for runtime in AI_RUNTIMES & set(services):
+        rt = services[runtime]
+        nets = _networks(rt)
+        if nets != {"ai"}:
+            problems.append(f"{runtime}: must be attached only to network 'ai', found {sorted(nets)}")
+        if not (networks.get("ai") or {}).get("internal"):
+            problems.append("network 'ai' must be internal (no internet) in the base compose file")
+        for name, svc in services.items():
+            if name != "api" and name not in AI_RUNTIMES and "ai" in _networks(svc):
+                problems.append(f"{name}: must not join the 'ai' network")
+        for key in rt.get("environment") or {}:
+            if any(k in key for k in ("DATABASE", "CLICKHOUSE", "VALKEY", "KAFKA", "RUNNER")):
+                problems.append(f"{runtime}: has platform setting {key}")
+        for secret in rt.get("secrets") or []:
+            if secret.get("source") not in AI_ALLOWED_SECRETS:
+                problems.append(f"{runtime}: unexpected secret {secret.get('source')}")
+        if (rt.get("environment") or {}).get("NOCSOC_AI_CLOUD_EGRESS_ENABLED", "false").lower() != "false":
+            problems.append(f"{runtime}: cloud egress must be off in the base compose file")
     return problems
 
 

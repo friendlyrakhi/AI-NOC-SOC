@@ -538,7 +538,8 @@ def test_alert_triage_and_raw_evidence(stream: StreamEnv) -> None:
     # Initech sees none of it.
     stream.api.switch(INITECH_ADMIN, "initech")
     assert stream.api.get(INITECH_ADMIN, f"/alerts/{alert['id']}").status_code == 404
-    assert stream.api.get(INITECH_ADMIN, "/alerts").json()["total"] == 0
+    initech_ids = {a["id"] for a in stream.api.get(INITECH_ADMIN, "/alerts", params={"limit": 200}).json()["items"]}
+    assert alert["id"] not in initech_ids  # Initech may have its own alerts (other suites), never Globex's
     stream.api.switch(ADMIN, "globex")
 
 
