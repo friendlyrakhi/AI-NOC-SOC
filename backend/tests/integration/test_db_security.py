@@ -31,11 +31,24 @@ TENANT_SCOPED = {
     "vuln_findings",
     "ingest_seen",
     "ingest_dead_letters",
+    # P3 incidents, topology and operations
+    "services",
+    "service_assets",
+    "incident_counters",
+    "incidents",
+    "incident_alerts",
+    "timeline_entries",
+    "incident_tasks",
+    "external_tickets",
+    "sla_policies",
+    "correlation_overrides",
+    "maintenance_windows",
+    "suppression_rules",
 }
 IDENTITY_ONLY = {"user_credentials", "sessions", "auth_challenges", "invitations"}  # no app policies
 GLOBAL = {"permissions", "alembic_version"}
 WORKER_ONLY = {"ingest_seen"}  # the app role has no grant at all
-AGGREGATE_READABLE = {"tenants", "audit_log", "alerts", "assets", "vuln_findings"}
+AGGREGATE_READABLE = {"tenants", "audit_log", "alerts", "assets", "vuln_findings", "incidents", "services"}
 
 
 def app_conn(env: Env, tenant: str | None = None, user: str | None = None) -> psycopg.Connection:

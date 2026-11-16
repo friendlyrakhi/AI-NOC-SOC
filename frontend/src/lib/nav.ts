@@ -32,6 +32,7 @@ export const PORTAL_SECTIONS: Record<Exclude<PortalKey, "admin" | "ops">, NavSec
       items: [
         { label: "Overview", href: "/noc", perm: "portal:noc" },
         { label: "Alerts & correlation", href: "/noc/alerts", perm: "alert:read" },
+        { label: "Incidents", href: "/incidents?portal=noc", perm: "incident:read" },
         { label: "Root cause analysis", href: "/noc/rca", perm: "incident:read" },
         { label: "SLA reporting", href: "/noc/sla", perm: "portal:noc" },
       ],
@@ -44,6 +45,8 @@ export const PORTAL_SECTIONS: Record<Exclude<PortalKey, "admin" | "ops">, NavSec
         { label: "Cloud operations", href: "/noc/cloud", perm: "asset:read" },
         { label: "Applications (APM)", href: "/noc/applications", perm: "asset:read" },
         { label: "Databases", href: "/noc/databases", perm: "asset:read" },
+        { label: "Services & topology", href: "/noc/topology", perm: "service:read" },
+        { label: "Maintenance", href: "/noc/maintenance", perm: "maintenance:read" },
       ],
     },
   ],
@@ -52,6 +55,7 @@ export const PORTAL_SECTIONS: Record<Exclude<PortalKey, "admin" | "ops">, NavSec
       title: "AI SOC",
       items: [
         { label: "Overview", href: "/soc", perm: "portal:soc" },
+        { label: "Cases", href: "/incidents?portal=soc", perm: "incident:read" },
         { label: "Investigations", href: "/soc/investigations", perm: "incident:read" },
         { label: "SIEM events", href: "/soc/siem", perm: "alert:read" },
         { label: "EDR / XDR", href: "/soc/edr", perm: "alert:read" },

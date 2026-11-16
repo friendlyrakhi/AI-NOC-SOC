@@ -150,12 +150,31 @@
         "title": "AggregateCustomerOut",
         "type": "object"
       },
+      "AlertLinks": {
+        "properties": {
+          "alert_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Alert Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "alert_ids"
+        ],
+        "title": "AlertLinks",
+        "type": "object"
+      },
       "AlertOut": {
         "properties": {
           "asset": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AssetBrief"
+                "$ref": "#/components/schemas/app__alerts__router__AssetBrief"
               },
               {
                 "type": "null"
@@ -192,6 +211,16 @@
             "title": "Id",
             "type": "string"
           },
+          "incident": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IncidentBrief"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "labels": {
             "additionalProperties": true,
             "title": "Labels",
@@ -224,6 +253,16 @@
           "sandbox": {
             "title": "Sandbox",
             "type": "boolean"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceBrief"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "service_hint": {
             "anyOf": [
@@ -274,6 +313,17 @@
             ],
             "title": "Status",
             "type": "string"
+          },
+          "suppression_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suppression Reason"
           },
           "title": {
             "title": "Title",
@@ -398,7 +448,7 @@
             "items": {
               "type": "string"
             },
-            "maxItems": 50,
+            "maxItems": 57,
             "minItems": 1,
             "title": "Permissions",
             "type": "array"
@@ -557,16 +607,71 @@
         "title": "ApiKeyOut",
         "type": "object"
       },
-      "AssetBrief": {
+      "AssetDetail": {
         "properties": {
+          "criticality": {
+            "title": "Criticality",
+            "type": "integer"
+          },
+          "environment": {
+            "title": "Environment",
+            "type": "string"
+          },
+          "first_seen": {
+            "format": "date-time",
+            "title": "First Seen",
+            "type": "string"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
           },
+          "identifiers": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Identifiers",
+            "type": "array"
+          },
+          "last_seen": {
+            "format": "date-time",
+            "title": "Last Seen",
+            "type": "string"
+          },
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "open_alerts": {
+            "title": "Open Alerts",
+            "type": "integer"
+          },
+          "open_vulns": {
+            "title": "Open Vulns",
+            "type": "integer"
+          },
+          "sandbox": {
+            "title": "Sandbox",
+            "type": "boolean"
+          },
+          "services": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Services",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
           },
           "type": {
             "title": "Type",
@@ -575,10 +680,20 @@
         },
         "required": [
           "id",
+          "type",
           "name",
-          "type"
+          "environment",
+          "criticality",
+          "identifiers",
+          "sources",
+          "services",
+          "open_alerts",
+          "open_vulns",
+          "sandbox",
+          "first_seen",
+          "last_seen"
         ],
-        "title": "AssetBrief",
+        "title": "AssetDetail",
         "type": "object"
       },
       "AssetOut": {
@@ -904,6 +1019,21 @@
           "code"
         ],
         "title": "CodeRequest",
+        "type": "object"
+      },
+      "CommentIn": {
+        "properties": {
+          "body": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "title": "CommentIn",
         "type": "object"
       },
       "ConnectionTestOut": {
@@ -1420,6 +1550,27 @@
         "title": "EnrollmentResponse",
         "type": "object"
       },
+      "Escalation": {
+        "properties": {
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "to_domain": {
+            "const": "joint",
+            "default": "joint",
+            "title": "To Domain",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "Escalation",
+        "type": "object"
+      },
       "EventPage": {
         "properties": {
           "items": {
@@ -1569,6 +1720,57 @@
         "title": "EventV1",
         "type": "object"
       },
+      "ExternalTicketCreate": {
+        "properties": {
+          "system": {
+            "const": "servicenow",
+            "default": "servicenow",
+            "title": "System",
+            "type": "string"
+          }
+        },
+        "title": "ExternalTicketCreate",
+        "type": "object"
+      },
+      "ExternalTicketOut": {
+        "properties": {
+          "external_number": {
+            "title": "External Number",
+            "type": "string"
+          },
+          "external_state": {
+            "title": "External State",
+            "type": "string"
+          },
+          "last_sync_origin": {
+            "title": "Last Sync Origin",
+            "type": "string"
+          },
+          "last_synced_at": {
+            "format": "date-time",
+            "title": "Last Synced At",
+            "type": "string"
+          },
+          "sync_state": {
+            "title": "Sync State",
+            "type": "string"
+          },
+          "system": {
+            "title": "System",
+            "type": "string"
+          }
+        },
+        "required": [
+          "system",
+          "external_number",
+          "external_state",
+          "sync_state",
+          "last_sync_origin",
+          "last_synced_at"
+        ],
+        "title": "ExternalTicketOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1611,6 +1813,393 @@
           "count"
         ],
         "title": "HistogramBucket",
+        "type": "object"
+      },
+      "IncidentBrief": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status"
+        ],
+        "title": "IncidentBrief",
+        "type": "object"
+      },
+      "IncidentCreate": {
+        "properties": {
+          "alert_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "title": "Alert Ids",
+            "type": "array"
+          },
+          "domain": {
+            "enum": [
+              "noc",
+              "soc"
+            ],
+            "title": "Domain",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "info"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "summary": {
+            "default": "",
+            "maxLength": 8000,
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "domain",
+          "severity"
+        ],
+        "title": "IncidentCreate",
+        "type": "object"
+      },
+      "IncidentOut": {
+        "properties": {
+          "acknowledged_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged At"
+          },
+          "alert_count": {
+            "title": "Alert Count",
+            "type": "integer"
+          },
+          "assignee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Id"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "commander_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commander Id"
+          },
+          "created_by_type": {
+            "enum": [
+              "correlation",
+              "user"
+            ],
+            "title": "Created By Type",
+            "type": "string"
+          },
+          "detected_at": {
+            "format": "date-time",
+            "title": "Detected At",
+            "type": "string"
+          },
+          "domain": {
+            "enum": [
+              "noc",
+              "soc",
+              "joint"
+            ],
+            "title": "Domain",
+            "type": "string"
+          },
+          "external_tickets": {
+            "items": {
+              "$ref": "#/components/schemas/ExternalTicketOut"
+            },
+            "title": "External Tickets",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "P1",
+              "P2",
+              "P3",
+              "P4"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "sandbox": {
+            "title": "Sandbox",
+            "type": "boolean"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceRef"
+            },
+            "title": "Services",
+            "type": "array"
+          },
+          "severity": {
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "info"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "sla": {
+            "$ref": "#/components/schemas/SlaOut"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "investigating",
+              "contained",
+              "mitigated",
+              "resolved",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "domain",
+          "title",
+          "summary",
+          "severity",
+          "priority",
+          "status",
+          "commander_id",
+          "assignee_id",
+          "services",
+          "detected_at",
+          "acknowledged_at",
+          "resolved_at",
+          "closed_at",
+          "created_by_type",
+          "alert_count",
+          "sla",
+          "external_tickets",
+          "sandbox",
+          "updated_at",
+          "version"
+        ],
+        "title": "IncidentOut",
+        "type": "object"
+      },
+      "IncidentPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "IncidentPage",
+        "type": "object"
+      },
+      "IncidentPatch": {
+        "properties": {
+          "assignee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Id"
+          },
+          "clear_assignee": {
+            "default": false,
+            "title": "Clear Assignee",
+            "type": "boolean"
+          },
+          "commander_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commander Id"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "enum": [
+                  "P1",
+                  "P2",
+                  "P3",
+                  "P4"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "maxLength": 8000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "IncidentPatch",
         "type": "object"
       },
       "InstanceCreate": {
@@ -2043,6 +2632,97 @@
         "title": "InviteResponse",
         "type": "object"
       },
+      "LinkedAlert": {
+        "properties": {
+          "added_by": {
+            "title": "Added By",
+            "type": "string"
+          },
+          "asset_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Name"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_seen": {
+            "format": "date-time",
+            "title": "Last Seen",
+            "type": "string"
+          },
+          "occurrence_count": {
+            "title": "Occurrence Count",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "rule_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Key"
+          },
+          "severity": {
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "info"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "severity",
+          "status",
+          "domain",
+          "connector_id",
+          "asset_name",
+          "last_seen",
+          "occurrence_count",
+          "added_by",
+          "rule_key",
+          "reason"
+        ],
+        "title": "LinkedAlert",
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "email": {
@@ -2102,6 +2782,128 @@
           "status"
         ],
         "title": "LoginResponse",
+        "type": "object"
+      },
+      "MaintenanceCreate": {
+        "properties": {
+          "asset_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "title": "Asset Ids",
+            "type": "array"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Reason",
+            "type": "string"
+          },
+          "service_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Service Ids",
+            "type": "array"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "starts_at",
+          "ends_at"
+        ],
+        "title": "MaintenanceCreate",
+        "type": "object"
+      },
+      "MaintenanceOut": {
+        "properties": {
+          "asset_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Asset Ids",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "service_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Service Ids",
+            "type": "array"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "scheduled",
+              "active",
+              "ended",
+              "cancelled"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "asset_ids",
+          "service_ids",
+          "starts_at",
+          "ends_at",
+          "reason",
+          "state",
+          "created_at"
+        ],
+        "title": "MaintenanceOut",
         "type": "object"
       },
       "MeResponse": {
@@ -2284,6 +3086,107 @@
           "status"
         ],
         "title": "MemberPatch",
+        "type": "object"
+      },
+      "MetricsOut": {
+        "properties": {
+          "ack_sla_attainment": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ack Sla Attainment"
+          },
+          "acknowledged": {
+            "title": "Acknowledged",
+            "type": "integer"
+          },
+          "by_priority": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Priority",
+            "type": "object"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "mtta_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mtta Seconds"
+          },
+          "mttr_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mttr Seconds"
+          },
+          "open": {
+            "title": "Open",
+            "type": "integer"
+          },
+          "portal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portal"
+          },
+          "resolve_sla_attainment": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolve Sla Attainment"
+          },
+          "resolved": {
+            "title": "Resolved",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "portal",
+          "days",
+          "total",
+          "open",
+          "acknowledged",
+          "resolved",
+          "mtta_seconds",
+          "mttr_seconds",
+          "ack_sla_attainment",
+          "resolve_sla_attainment",
+          "by_priority"
+        ],
+        "title": "MetricsOut",
         "type": "object"
       },
       "MspCreate": {
@@ -2557,7 +3460,7 @@
             "items": {
               "type": "string"
             },
-            "maxItems": 50,
+            "maxItems": 57,
             "title": "Permissions",
             "type": "array"
           }
@@ -2645,7 +3548,7 @@
                 "items": {
                   "type": "string"
                 },
-                "maxItems": 50,
+                "maxItems": 57,
                 "type": "array"
               },
               {
@@ -2680,6 +3583,64 @@
           "name"
         ],
         "title": "RoleRef",
+        "type": "object"
+      },
+      "RuleOut": {
+        "properties": {
+          "default_window_minutes": {
+            "title": "Default Window Minutes",
+            "type": "integer"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "window_minutes": {
+            "title": "Window Minutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "description",
+          "enabled",
+          "window_minutes",
+          "default_window_minutes"
+        ],
+        "title": "RuleOut",
+        "type": "object"
+      },
+      "RulePatch": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "window_minutes": {
+            "maximum": 1440.0,
+            "minimum": 1.0,
+            "title": "Window Minutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "enabled",
+          "window_minutes"
+        ],
+        "title": "RulePatch",
         "type": "object"
       },
       "RunOut": {
@@ -2910,6 +3871,330 @@
         "title": "ScenarioOut",
         "type": "object"
       },
+      "SearchHit": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "alert",
+              "incident",
+              "asset",
+              "service"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "subtitle": {
+            "title": "Subtitle",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "title",
+          "subtitle",
+          "severity",
+          "at"
+        ],
+        "title": "SearchHit",
+        "type": "object"
+      },
+      "SearchOut": {
+        "properties": {
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/SearchHit"
+            },
+            "title": "Hits",
+            "type": "array"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query",
+          "hits"
+        ],
+        "title": "SearchOut",
+        "type": "object"
+      },
+      "ServiceBrief": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ServiceBrief",
+        "type": "object"
+      },
+      "ServiceDetail": {
+        "properties": {
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Aliases",
+            "type": "array"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/app__topology__AssetBrief"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "dependencies": {
+            "title": "Dependencies",
+            "type": "integer"
+          },
+          "health": {
+            "enum": [
+              "healthy",
+              "degraded",
+              "down"
+            ],
+            "title": "Health",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "in_maintenance": {
+            "title": "In Maintenance",
+            "type": "boolean"
+          },
+          "members": {
+            "title": "Members",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "open_alerts": {
+            "title": "Open Alerts",
+            "type": "integer"
+          },
+          "open_incidents": {
+            "title": "Open Incidents",
+            "type": "integer"
+          },
+          "owner_team": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Team"
+          },
+          "sandbox": {
+            "title": "Sandbox",
+            "type": "boolean"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "integer"
+          },
+          "worst_open_severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worst Open Severity"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "tier",
+          "owner_team",
+          "aliases",
+          "members",
+          "dependencies",
+          "open_alerts",
+          "open_incidents",
+          "worst_open_severity",
+          "health",
+          "in_maintenance",
+          "sandbox",
+          "assets"
+        ],
+        "title": "ServiceDetail",
+        "type": "object"
+      },
+      "ServiceOut": {
+        "properties": {
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Aliases",
+            "type": "array"
+          },
+          "dependencies": {
+            "title": "Dependencies",
+            "type": "integer"
+          },
+          "health": {
+            "enum": [
+              "healthy",
+              "degraded",
+              "down"
+            ],
+            "title": "Health",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "in_maintenance": {
+            "title": "In Maintenance",
+            "type": "boolean"
+          },
+          "members": {
+            "title": "Members",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "open_alerts": {
+            "title": "Open Alerts",
+            "type": "integer"
+          },
+          "open_incidents": {
+            "title": "Open Incidents",
+            "type": "integer"
+          },
+          "owner_team": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Team"
+          },
+          "sandbox": {
+            "title": "Sandbox",
+            "type": "boolean"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "integer"
+          },
+          "worst_open_severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worst Open Severity"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "tier",
+          "owner_team",
+          "aliases",
+          "members",
+          "dependencies",
+          "open_alerts",
+          "open_incidents",
+          "worst_open_severity",
+          "health",
+          "in_maintenance",
+          "sandbox"
+        ],
+        "title": "ServiceOut",
+        "type": "object"
+      },
+      "ServiceRef": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "tier"
+        ],
+        "title": "ServiceRef",
+        "type": "object"
+      },
       "SessionResponse": {
         "properties": {
           "session_token": {
@@ -2921,6 +4206,126 @@
           "session_token"
         ],
         "title": "SessionResponse",
+        "type": "object"
+      },
+      "SlaOut": {
+        "properties": {
+          "ack_breached": {
+            "title": "Ack Breached",
+            "type": "boolean"
+          },
+          "ack_due_at": {
+            "format": "date-time",
+            "title": "Ack Due At",
+            "type": "string"
+          },
+          "resolve_breached": {
+            "title": "Resolve Breached",
+            "type": "boolean"
+          },
+          "resolve_due_at": {
+            "format": "date-time",
+            "title": "Resolve Due At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ack_due_at",
+          "resolve_due_at",
+          "ack_breached",
+          "resolve_breached"
+        ],
+        "title": "SlaOut",
+        "type": "object"
+      },
+      "SlaPolicy": {
+        "properties": {
+          "custom": {
+            "default": false,
+            "title": "Custom",
+            "type": "boolean"
+          },
+          "targets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SlaTarget"
+            },
+            "propertyNames": {
+              "enum": [
+                "P1",
+                "P2",
+                "P3",
+                "P4"
+              ]
+            },
+            "title": "Targets",
+            "type": "object"
+          }
+        },
+        "required": [
+          "targets"
+        ],
+        "title": "SlaPolicy",
+        "type": "object"
+      },
+      "SlaTarget": {
+        "properties": {
+          "ack": {
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Ack",
+            "type": "integer"
+          },
+          "resolve": {
+            "maximum": 1000000.0,
+            "minimum": 1.0,
+            "title": "Resolve",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ack",
+          "resolve"
+        ],
+        "title": "SlaTarget",
+        "type": "object"
+      },
+      "StatusChange": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "to": {
+            "enum": [
+              "open",
+              "investigating",
+              "contained",
+              "mitigated",
+              "resolved",
+              "closed"
+            ],
+            "title": "To",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "to",
+          "version"
+        ],
+        "title": "StatusChange",
         "type": "object"
       },
       "StreamOut": {
@@ -3024,6 +4429,171 @@
         "title": "SummaryOut",
         "type": "object"
       },
+      "SuppressionCreate": {
+        "properties": {
+          "expires_in_hours": {
+            "default": 24,
+            "maximum": 720.0,
+            "minimum": 1.0,
+            "title": "Expires In Hours",
+            "type": "integer"
+          },
+          "match": {
+            "$ref": "#/components/schemas/SuppressionMatch"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "match",
+          "reason"
+        ],
+        "title": "SuppressionCreate",
+        "type": "object"
+      },
+      "SuppressionMatch": {
+        "description": "All given conditions must match (at least one is required).",
+        "properties": {
+          "asset_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id"
+          },
+          "connector": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connector"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "enum": [
+                  "noc",
+                  "soc"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "critical",
+                    "high",
+                    "medium",
+                    "low",
+                    "info"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "title_contains": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 3,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Contains"
+          }
+        },
+        "title": "SuppressionMatch",
+        "type": "object"
+      },
+      "SuppressionOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "hits": {
+            "title": "Hits",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "match": {
+            "additionalProperties": true,
+            "title": "Match",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "match",
+          "reason",
+          "expires_at",
+          "enabled",
+          "hits",
+          "created_at"
+        ],
+        "title": "SuppressionOut",
+        "type": "object"
+      },
       "SwitchTenantRequest": {
         "properties": {
           "aggregate": {
@@ -3041,6 +4611,190 @@
           "tenant_id"
         ],
         "title": "SwitchTenantRequest",
+        "type": "object"
+      },
+      "TaskCreate": {
+        "properties": {
+          "assignee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Id"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "runbook_ref": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runbook Ref"
+          },
+          "title": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "TaskCreate",
+        "type": "object"
+      },
+      "TaskOut": {
+        "properties": {
+          "assignee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Id"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "runbook_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runbook Ref"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "in_progress",
+              "done"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "assignee_id",
+          "due_at",
+          "runbook_ref",
+          "updated_at",
+          "version"
+        ],
+        "title": "TaskOut",
+        "type": "object"
+      },
+      "TaskPatch": {
+        "properties": {
+          "assignee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "open",
+                  "in_progress",
+                  "done"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "TaskPatch",
         "type": "object"
       },
       "TenantAccessOut": {
@@ -3184,6 +4938,66 @@
         "title": "TenantRef",
         "type": "object"
       },
+      "TimelineOut": {
+        "properties": {
+          "actor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "actor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Name"
+          },
+          "actor_type": {
+            "title": "Actor Type",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "body": {
+            "additionalProperties": true,
+            "title": "Body",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "actor_type",
+          "actor_id",
+          "actor_name",
+          "body",
+          "at"
+        ],
+        "title": "TimelineOut",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -3229,7 +5043,7 @@
           "asset": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AssetBrief"
+                "$ref": "#/components/schemas/app__alerts__router__AssetBrief"
               },
               {
                 "type": "null"
@@ -3458,6 +5272,80 @@
         ],
         "title": "WorkItem",
         "type": "object"
+      },
+      "app__alerts__router__AssetBrief": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type"
+        ],
+        "title": "AssetBrief",
+        "type": "object"
+      },
+      "app__topology__AssetBrief": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "open_alerts": {
+            "title": "Open Alerts",
+            "type": "integer"
+          },
+          "role": {
+            "enum": [
+              "member",
+              "dependency"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "worst_open_severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worst Open Severity"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "role",
+          "open_alerts",
+          "worst_open_severity"
+        ],
+        "title": "AssetBrief",
+        "type": "object"
       }
     }
   },
@@ -3656,6 +5544,56 @@
                 }
               ],
               "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "service_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Service Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "asset_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Asset Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "in_incident",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "In Incident"
             }
           },
           {
@@ -4136,6 +6074,52 @@
         "summary": "List Assets",
         "tags": [
           "alerts"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "asset:read",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/assets/{asset_id}": {
+      "get": {
+        "operationId": "get_asset_api_v1_assets__asset_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Asset",
+        "tags": [
+          "topology and operations"
         ],
         "x-aggregate": false,
         "x-required-permission": "asset:read",
@@ -5215,6 +7199,93 @@
         "x-step-up": false
       }
     },
+    "/api/v1/correlation-rules": {
+      "get": {
+        "operationId": "list_rules_api_v1_correlation_rules_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RuleOut"
+                  },
+                  "title": "Response List Rules Api V1 Correlation Rules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Rules",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:read",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/correlation-rules/{key}": {
+      "patch": {
+        "operationId": "patch_rule_api_v1_correlation_rules__key__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RulePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RuleOut"
+                  },
+                  "title": "Response Patch Rule Api V1 Correlation Rules  Key  Patch",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Rule",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "correlation:manage",
+        "x-step-up": true
+      }
+    },
     "/api/v1/customers": {
       "get": {
         "operationId": "list_customers_api_v1_customers_get",
@@ -5797,6 +7868,1034 @@
         "x-required-permission": "public"
       }
     },
+    "/api/v1/incidents": {
+      "get": {
+        "operationId": "list_incidents_api_v1_incidents_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "portal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "noc",
+                    "soc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Portal"
+            }
+          },
+          {
+            "in": "query",
+            "name": "domain",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "noc",
+                    "soc",
+                    "joint"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Domain"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "open",
+                      "investigating",
+                      "contained",
+                      "mitigated",
+                      "resolved",
+                      "closed"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "priority",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "P1",
+                      "P2",
+                      "P3",
+                      "P4"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority"
+            }
+          },
+          {
+            "in": "query",
+            "name": "open_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Open Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "priority",
+              "enum": [
+                "priority",
+                "detected",
+                "updated"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 100000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Incidents",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:read",
+        "x-step-up": false
+      },
+      "post": {
+        "operationId": "create_incident_api_v1_incidents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Incident",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:create",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/incidents/metrics": {
+      "get": {
+        "description": "MTTA = mean(acknowledged - detected) over acknowledged incidents; MTTR = mean(resolved -\ndetected) over resolved incidents. SLA attainment counts only incidents whose target has\neither been met or has already passed.",
+        "operationId": "incident_metrics_api_v1_incidents_metrics_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "portal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "noc",
+                    "soc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Portal"
+            }
+          },
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Incident Metrics",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:read",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/incidents/{incident_id}": {
+      "get": {
+        "operationId": "get_incident_api_v1_incidents__incident_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Incident",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:read",
+        "x-step-up": false
+      },
+      "patch": {
+        "operationId": "patch_incident_api_v1_incidents__incident_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Incident",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:update",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/incidents/{incident_id}/alerts": {
+      "get": {
+        "operationId": "incident_alerts_api_v1_incidents__incident_id__alerts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LinkedAlert"
+                  },
+                  "title": "Response Incident Alerts Api V1 Incidents  Incident Id  Alerts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Incident Alerts",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:read",
+        "x-step-up": false
+      },
+      "post": {
+        "operationId": "link_alerts_api_v1_incidents__incident_id__alerts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertLinks"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Link Alerts",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:update",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/incidents/{incident_id}/alerts/{alert_id}": {
+      "delete": {
+        "operationId": "unlink_alert_api_v1_incidents__incident_id__alerts__alert_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "alert_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Alert Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unlink Alert",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:update",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/incidents/{incident_id}/comments": {
+      "post": {
+        "operationId": "add_comment_api_v1_incidents__incident_id__comments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Comment",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:comment",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/incidents/{incident_id}/escalate": {
+      "post": {
+        "operationId": "escalate_api_v1_incidents__incident_id__escalate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Escalation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Escalate",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:escalate",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/incidents/{incident_id}/external-tickets": {
+      "post": {
+        "description": "Opens a ServiceNow incident through the sandbox connector (simulated action; nothing\nleaves the platform) and links it for two-way status sync.",
+        "operationId": "create_external_ticket_api_v1_incidents__incident_id__external_tickets_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalTicketCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create External Ticket",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:sync",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/incidents/{incident_id}/status": {
+      "post": {
+        "operationId": "change_status_api_v1_incidents__incident_id__status_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Status",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:update",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/incidents/{incident_id}/tasks": {
+      "get": {
+        "operationId": "list_tasks_api_v1_incidents__incident_id__tasks_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TaskOut"
+                  },
+                  "title": "Response List Tasks Api V1 Incidents  Incident Id  Tasks Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tasks",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:read",
+        "x-step-up": false
+      },
+      "post": {
+        "operationId": "create_task_api_v1_incidents__incident_id__tasks_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Task",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:update",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/incidents/{incident_id}/tasks/{task_id}": {
+      "patch": {
+        "operationId": "patch_task_api_v1_incidents__incident_id__tasks__task_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Task",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:update",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/incidents/{incident_id}/timeline": {
+      "get": {
+        "description": "Oldest first. ``after`` is the last entry id already seen (for live polling).",
+        "operationId": "get_timeline_api_v1_incidents__incident_id__timeline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "After",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TimelineOut"
+                  },
+                  "title": "Response Get Timeline Api V1 Incidents  Incident Id  Timeline Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Timeline",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:read",
+        "x-step-up": false
+      }
+    },
     "/api/v1/ingest/webhooks/{instance_id}": {
       "post": {
         "operationId": "webhook_ingress_api_v1_ingest_webhooks__instance_id__post",
@@ -5956,6 +9055,137 @@
           "internal"
         ],
         "x-required-permission": "internal"
+      }
+    },
+    "/api/v1/maintenance-windows": {
+      "get": {
+        "operationId": "list_maintenance_api_v1_maintenance_windows_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include_past",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Past",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MaintenanceOut"
+                  },
+                  "title": "Response List Maintenance Api V1 Maintenance Windows Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Maintenance",
+        "tags": [
+          "topology and operations"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "maintenance:read",
+        "x-step-up": false
+      },
+      "post": {
+        "operationId": "create_maintenance_api_v1_maintenance_windows_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaintenanceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Maintenance",
+        "tags": [
+          "topology and operations"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "maintenance:manage",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/maintenance-windows/{window_id}": {
+      "delete": {
+        "operationId": "cancel_maintenance_api_v1_maintenance_windows__window_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "window_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Window Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Maintenance",
+        "tags": [
+          "topology and operations"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "maintenance:manage",
+        "x-step-up": false
       }
     },
     "/api/v1/permissions": {
@@ -6213,6 +9443,338 @@
         "x-aggregate": false,
         "x-required-permission": "role:manage",
         "x-step-up": true
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "description": "Postgres full-text search over alerts, incidents, assets and services (prefix match on\nthe last word). Results respect the caller's permissions per kind.",
+        "operationId": "search_api_v1_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 2,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search",
+        "tags": [
+          "topology and operations"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "search:read",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/services": {
+      "get": {
+        "operationId": "list_services_api_v1_services_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ServiceOut"
+                  },
+                  "title": "Response List Services Api V1 Services Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Services",
+        "tags": [
+          "topology and operations"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "service:read",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/services/{service_id}": {
+      "get": {
+        "operationId": "get_service_api_v1_services__service_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "service_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Service Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Service",
+        "tags": [
+          "topology and operations"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "service:read",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/sla-policy": {
+      "get": {
+        "operationId": "get_sla_api_v1_sla_policy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlaPolicy"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Sla",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "incident:read",
+        "x-step-up": false
+      },
+      "put": {
+        "operationId": "put_sla_api_v1_sla_policy_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlaPolicy"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlaPolicy"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Sla",
+        "tags": [
+          "incidents"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "sla:manage",
+        "x-step-up": true
+      }
+    },
+    "/api/v1/stream": {
+      "get": {
+        "description": "``text/event-stream`` of ``alert.upserted`` and ``incident.changed`` for the caller's tenant.",
+        "operationId": "stream_api_v1_stream_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Stream",
+        "tags": [
+          "live"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "alert:read",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/suppression-rules": {
+      "get": {
+        "operationId": "list_suppression_api_v1_suppression_rules_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SuppressionOut"
+                  },
+                  "title": "Response List Suppression Api V1 Suppression Rules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Suppression",
+        "tags": [
+          "topology and operations"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "alert:read",
+        "x-step-up": false
+      },
+      "post": {
+        "operationId": "create_suppression_api_v1_suppression_rules_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuppressionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuppressionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Suppression",
+        "tags": [
+          "topology and operations"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "alert:suppress",
+        "x-step-up": false
+      }
+    },
+    "/api/v1/suppression-rules/{rule_id}": {
+      "delete": {
+        "operationId": "delete_suppression_api_v1_suppression_rules__rule_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rule Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Suppression",
+        "tags": [
+          "topology and operations"
+        ],
+        "x-aggregate": false,
+        "x-required-permission": "alert:suppress",
+        "x-step-up": false
       }
     },
     "/api/v1/tenant": {

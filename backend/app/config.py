@@ -91,6 +91,10 @@ class Settings(BaseSettings):
 
     # Per-tenant API budget for expensive endpoints (scenario replay, event search).
     tenant_heavy_requests_per_minute: int = Field(default=60, ge=1, le=10_000)
+    # Per-tenant ingest quota (records per minute). Over-quota records are dead-lettered with
+    # reason "quota_exceeded" (kept, visible to the tenant, replayable), so one noisy tenant
+    # cannot monopolise the ingest workers.
+    tenant_ingest_records_per_minute: int = Field(default=6000, ge=10, le=1_000_000)
 
     def _url(self, user: str, password: SecretStr | None) -> str:
         pw = quote(password.get_secret_value(), safe="") if password else ""

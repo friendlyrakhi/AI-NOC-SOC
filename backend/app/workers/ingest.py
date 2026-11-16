@@ -14,14 +14,17 @@ import logging
 import signal
 import time
 from typing import Any
+from uuid import UUID
 
+import redis.asyncio as redis
 from aiokafka import AIOKafkaConsumer
 from sqlalchemy import text
 
+from app import live
 from app.analytics import ingest_client
 from app.config import Settings, get_settings
 from app.db.engines import AppDatabase
-from app.ingestion.pipeline import DeadLetterError, Ingestor
+from app.ingestion.pipeline import DeadLetterError, Ingestor, Outcome
 from app.logging_setup import configure_logging
 from app.streaming import ALERTS_UPSERTED, MAX_MESSAGE_BYTES, Publisher
 
@@ -45,6 +48,12 @@ class Worker:
         self.db = AppDatabase(settings, url=settings.worker_database_url())
         self.analytics: Any = None
         self.publisher = Publisher(settings.kafka_bootstrap)
+        self.valkey = redis.Redis(
+            host=settings.valkey_host,
+            port=settings.valkey_port,
+            password=settings.valkey_password.get_secret_value() if settings.valkey_password else None,
+            socket_timeout=2,
+        )
         self.consumer = AIOKafkaConsumer(
             bootstrap_servers=settings.kafka_bootstrap,
             group_id=GROUP_ID,
@@ -60,7 +69,7 @@ class Worker:
     async def start(self) -> None:
         if self.settings.clickhouse_host and self.settings.clickhouse_ingest_password:
             self.analytics = await ingest_client(self.settings)
-        self.ingestor = Ingestor(self.db, self.analytics, self.settings.clickhouse_database)
+        self.ingestor = Ingestor(self.db, self.analytics, self.settings.clickhouse_database, quota=self.within_quota)
         await self.publisher.start()
         self.consumer.subscribe(pattern=TOPIC_PATTERN)
         await self.consumer.start()
@@ -71,6 +80,7 @@ class Worker:
         await self.publisher.stop()
         if self.analytics is not None:
             await self.analytics.close()
+        await self.valkey.aclose()
         await self.db.dispose()
         logger.info("ingest worker stopped %s", self.stats)
 
@@ -81,6 +91,7 @@ class Worker:
                 self.stats[outcome.result] += 1
                 for alert_id in outcome.alerts:
                     await self.publisher.publish_json(ALERTS_UPSERTED, alert_id, {"alert_id": alert_id})
+                await self.notify(outcome)
                 return
             except Exception as exc:
                 logger.warning("processing failed (attempt %d/%d): %s", attempt, MAX_ATTEMPTS, type(exc).__name__)
@@ -91,6 +102,29 @@ class Worker:
                     )
                     return
                 await asyncio.sleep(0.5 * attempt)
+
+    async def within_quota(self, tenant: UUID) -> bool:
+        """Fixed one-minute window per tenant. Fails open if Valkey is unavailable: the quota
+        protects fairness, and losing it briefly is better than stopping all ingestion."""
+        key = f"t:{tenant}:ingest:{int(time.time() // 60)}"
+        try:
+            async with self.valkey.pipeline(transaction=True) as pipe:
+                pipe.incr(key)
+                pipe.expire(key, 120, nx=True)
+                count, _ = await pipe.execute()
+        except Exception as exc:
+            logger.warning("ingest quota check failed open: %s", type(exc).__name__)
+            return True
+        return int(count) <= self.settings.tenant_ingest_records_per_minute
+
+    async def notify(self, outcome: Outcome) -> None:
+        """Live updates after commit (SSE). One event per alert/incident, capped per message."""
+        if outcome.tenant is None:
+            return
+        for alert_id in outcome.alerts[:20]:
+            await live.publish(self.valkey, outcome.tenant, {"type": "alert.upserted", "id": alert_id})
+        for incident_id in outcome.incidents[:20]:
+            await live.publish(self.valkey, outcome.tenant, {"type": "incident.changed", "id": incident_id})
 
     async def prune_ledger(self) -> int:
         async with self.db.engine.begin() as conn:

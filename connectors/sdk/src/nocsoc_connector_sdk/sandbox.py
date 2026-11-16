@@ -73,6 +73,64 @@ class World:
         ips = {h: f"10.{r.randint(10, 60)}.{r.randint(0, 255)}.{r.randint(2, 254)}" for h in hosts + win + net + dbs}
         return cls(prefix, hosts, win, net, dbs, cloud, apps, services, users, ips)
 
+    def topology(self) -> list[dict[str, Any]]:
+        """The CMDB view of this estate: business services, the hosts that run them and the
+        infrastructure they depend on, as (identifier kind, value) pairs. Derived from the fields
+        above without new randomness, so existing simulator output is unchanged."""
+        h, w, d, p = self.hosts, self.windows_hosts, self.databases, self.prefix
+        core1, core2, dist, fw, wan, lb = self.network_devices
+
+        def hn(*names: str) -> list[tuple[str, str]]:
+            return [("hostname", n) for n in names]
+
+        return [
+            {
+                "key": "payments",
+                "name": "Payments",
+                "tier": 1,
+                "team": "Payments Platform",
+                "aliases": ["payments-api"],
+                "members": hn(*h[0:2]),
+                "depends_on": hn(core1, dist, d[1], lb),
+            },
+            {
+                "key": "orders",
+                "name": "Order Management",
+                "tier": 2,
+                "team": "Commerce",
+                "aliases": ["orders-worker"],
+                "members": hn(*h[2:4]),
+                "depends_on": [*hn(core1, dist, d[0]), ("cloud_id", f"{p}-orders-db")],
+            },
+            {
+                "key": "portal",
+                "name": "Customer Portal",
+                "tier": 1,
+                "team": "Digital",
+                "aliases": ["customer-portal"],
+                "members": hn(*h[4:6]),
+                "depends_on": hn(core2, lb, d[3]),
+            },
+            {
+                "key": "sso",
+                "name": "Identity (SSO)",
+                "tier": 1,
+                "team": "Identity",
+                "aliases": ["identity-sso", "sso"],
+                "members": hn(*h[6:8], "sso"),
+                "depends_on": hn(core2, fw),
+            },
+            {
+                "key": "files",
+                "name": "File Services",
+                "tier": 3,
+                "team": "Workplace",
+                "aliases": ["file-share"],
+                "members": hn(*w[0:1]),
+                "depends_on": hn(core2, wan),
+            },
+        ]
+
 
 @dataclass(frozen=True)
 class GridStream:

@@ -49,6 +49,17 @@ class AssetBrief(BaseModel):
     type: str
 
 
+class ServiceBrief(BaseModel):
+    id: UUID
+    name: str
+
+
+class IncidentBrief(BaseModel):
+    id: UUID
+    number: str
+    status: str
+
+
 class AlertOut(BaseModel):
     id: UUID
     domain: Literal["noc", "soc"]
@@ -62,6 +73,9 @@ class AlertOut(BaseModel):
     category: str
     asset: AssetBrief | None
     service_hint: str | None
+    service: ServiceBrief | None = None
+    incident: IncidentBrief | None = None
+    suppression_reason: str | None = None
     first_seen: datetime
     last_seen: datetime
     occurrence_count: int
@@ -97,9 +111,15 @@ class SummaryOut(BaseModel):
 _ALERT_SELECT = """
 SELECT a.id, a.domain, a.connector_id, a.source_instance_id, a.source_alert_id, a.title, a.description,
        a.severity, a.status, a.category, a.service_hint, a.first_seen, a.last_seen, a.occurrence_count,
-       a.mitre_techniques, a.observables, a.labels, a.sandbox, a.version,
-       CASE WHEN s.id IS NULL THEN NULL ELSE json_build_object('id', s.id, 'name', s.name, 'type', s.type) END AS asset
+       a.mitre_techniques, a.observables, a.labels, a.sandbox, a.version, a.suppression_reason,
+       CASE WHEN s.id IS NULL THEN NULL ELSE json_build_object('id', s.id, 'name', s.name, 'type', s.type) END AS asset,
+       CASE WHEN sv.id IS NULL THEN NULL ELSE json_build_object('id', sv.id, 'name', sv.name) END AS service,
+       CASE WHEN i.id IS NULL THEN NULL
+            ELSE json_build_object('id', i.id, 'number', i.number, 'status', i.status) END AS incident
   FROM alerts a LEFT JOIN assets s ON s.id = a.asset_id
+  LEFT JOIN services sv ON sv.id = a.service_id
+  LEFT JOIN incident_alerts ia ON ia.alert_id = a.id
+  LEFT JOIN incidents i ON i.id = ia.incident_id
 """
 
 SORTS = {
@@ -118,6 +138,9 @@ async def list_alerts(
     status: Annotated[list[AlertStatus] | None, Query()] = None,
     connector: str | None = Query(default=None, max_length=64),
     q: str | None = Query(default=None, max_length=200),
+    service_id: UUID | None = None,
+    asset_id: UUID | None = None,
+    in_incident: bool | None = None,
     sort: Literal["last_seen", "severity", "occurrences"] = "severity",
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0, le=100_000)] = 0,
@@ -136,6 +159,16 @@ async def list_alerts(
     if connector:
         where.append("a.connector_id = :c")
         params["c"] = connector
+    if service_id:
+        where.append("a.service_id = :svc")
+        params["svc"] = service_id
+    if asset_id:
+        where.append("a.asset_id = :ast")
+        params["ast"] = asset_id
+    if in_incident is not None:
+        where.append(
+            ("" if in_incident else "NOT ") + "EXISTS (SELECT 1 FROM incident_alerts x WHERE x.alert_id = a.id)"  # nosec B608
+        )
     if q:
         where.append("(a.title ILIKE :q OR a.source_alert_id ILIKE :q OR s.name ILIKE :q)")
         params["q"] = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"

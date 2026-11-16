@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Any, ClassVar, Literal
 
 from nocsoc_connector_sdk import (
+    ActionInvocation,
+    ActionResult,
     AlertV1,
     AssetRef,
     AssetV1,
@@ -16,6 +18,7 @@ from nocsoc_connector_sdk import (
     Paged,
     RawRecord,
     SchemaDriftError,
+    ServiceV1,
     Simulator,
     TicketV1,
     VulnFindingV1,
@@ -249,6 +252,7 @@ class ServiceNowSimulator(Simulator):
     grid: ClassVar[dict[str, GridStream]] = {
         "incidents": GridStream("/api/now/table/incident", "result", 600),
         "cmdb_servers": GridStream("/api/now/table/cmdb_ci_server", "result", 600),
+        "cmdb_services": GridStream("/api/now/table/cmdb_ci_service", "result", 600),
     }
 
     @staticmethod
@@ -268,6 +272,28 @@ class ServiceNowSimulator(Simulator):
 
     def make_item(self, stream: str, ts: datetime, rng: random.Random, slot: int) -> dict[str, Any]:
         w = self.world
+        if stream == "cmdb_services":
+            svc = w.topology()[slot % len(w.topology())]
+
+            def ci(kind: str, value: str, rel: str) -> dict[str, Any]:
+                child = {
+                    "display_value": value,
+                    "sys_class_name": "cmdb_ci_cloud_database" if kind == "cloud_id" else "cmdb_ci",
+                }
+                if kind == "cloud_id":
+                    child["object_id"] = value
+                return {"type": rel, "child": child}
+
+            return {
+                "sys_id": f"{stable_int(w.prefix, svc['key'], 'svc', mod=16**32):032x}",
+                "name": svc["name"],
+                "busines_criticality": f"{svc['tier']} - {['most critical', 'somewhat critical', 'less critical', 'not critical'][svc['tier'] - 1]}",
+                "owned_by": {"display_value": svc["team"]},
+                "u_app_aliases": ",".join(svc["aliases"]),
+                "relations": [ci(k, v, "Runs on::Runs") for k, v in svc["members"]]
+                + [ci(k, v, "Depends on::Used by") for k, v in svc["depends_on"]],
+                "sys_updated_on": self._sn_time(ts),
+            }
         if stream == "cmdb_servers":
             host = (w.hosts + w.windows_hosts)[slot % 20]
             return {
@@ -324,11 +350,38 @@ class ServiceNowItsm(Connector):
         "cmdb_servers": Paged(
             "/api/now/table/cmdb_ci_server", "result", "sys_id", "sys_updated_on", "servicenow.cmdb_ci_server@1"
         ),
+        "cmdb_services": Paged(
+            "/api/now/table/cmdb_ci_service", "result", "sys_id", "sys_updated_on", "servicenow.cmdb_ci_service@1"
+        ),
     }
 
     @staticmethod
     def normalize(stream: str, record: RawRecord) -> list[NormalizedRecord]:
         p = record.payload
+        if stream == "cmdb_services":
+            require(p, "sys_id", "name", "relations")
+            members: list[AssetRef] = []
+            depends: list[AssetRef] = []
+            for rel in p["relations"]:
+                child = rel.get("child") or {}
+                value = child.get("object_id") or child.get("display_value")
+                if not value:
+                    continue
+                ref = AssetRef(kind="cloud_id", value=value) if child.get("object_id") else host_ref(value)
+                (members if str(rel.get("type", "")).startswith("Runs on") else depends).append(ref)
+            tier_text = str(p.get("busines_criticality", "3"))[:1]
+            return [
+                ServiceV1(
+                    external_id=p["sys_id"],
+                    name=clip(p["name"], 200),
+                    tier=int(tier_text) if tier_text in "1234" else 3,
+                    owner_team=(p.get("owned_by") or {}).get("display_value"),
+                    aliases=[a.strip() for a in str(p.get("u_app_aliases", "")).split(",") if a.strip()][:20],
+                    members=members[:200],
+                    depends_on=depends[:100],
+                    observed_at=record.observed_at,
+                )
+            ]
         if stream == "cmdb_servers":
             require(p, "sys_id", "name")
             refs = [host_ref(p["name"])] + ([AssetRef(kind="ip", value=p["ip_address"])] if p.get("ip_address") else [])
@@ -358,6 +411,34 @@ class ServiceNowItsm(Connector):
                 observed_at=record.observed_at,
             )
         ]
+
+    def simulate_action(self, invocation: ActionInvocation) -> ActionResult:
+        """Sandbox ITSM: a created ticket gets a stable sys_id and number derived from the platform
+        reference, so repeated simulations agree and inbound echoes can be matched."""
+        if invocation.key == "itsm.create_incident":
+            ref = str(invocation.target.get("ref", ""))
+            n = 9_000_000 + stable_int(self.ctx.tenant_id, ref, "sn-create", mod=999_999)
+            after = {
+                "sys_id": f"{stable_int(self.ctx.tenant_id, ref, 'sn-sys', mod=16**32):032x}",
+                "number": f"INC{n:07d}",
+                "state": "1",
+            }
+            return ActionResult(
+                status="succeeded",
+                mode="simulate",
+                simulated=True,
+                after=after,
+                message=f"Simulated ServiceNow {after['number']}",
+            )
+        if invocation.key == "itsm.update_incident":
+            after = {
+                "sys_id": str(invocation.target.get("sys_id", "")),
+                "state": str(invocation.params.get("state", "2")),
+            }
+            return ActionResult(
+                status="succeeded", mode="simulate", simulated=True, after=after, message="Simulated ServiceNow update"
+            )
+        return super().simulate_action(invocation)
 
     def parse_webhook(self, body: dict[str, Any]) -> list[tuple[str, RawRecord]]:
         require(body, "sys_id", "number")

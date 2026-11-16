@@ -39,6 +39,10 @@ PERMISSIONS: dict[str, str] = {
     "connector:secret:write": "Set integration credentials",
     "asset:read": "View assets",
     "asset:update": "Update assets",
+    "service:read": "View business services and topology",
+    "service:manage": "Change business services",
+    "maintenance:read": "View maintenance windows",
+    "maintenance:manage": "Create and cancel maintenance windows",
     "alert:read": "View alerts",
     "alert:update": "Triage alerts",
     "alert:suppress": "Manage suppression rules",
@@ -47,6 +51,9 @@ PERMISSIONS: dict[str, str] = {
     "incident:update": "Update incidents",
     "incident:comment": "Comment on incidents",
     "incident:escalate": "Escalate incidents",
+    "incident:sync": "Link incidents to external ticketing (ServiceNow)",
+    "correlation:manage": "Tune correlation rules",
+    "sla:manage": "Manage SLA policies",
     "vuln:read": "View vulnerabilities",
     "vuln:update": "Update vulnerability findings",
     "ai:use": "Use AI assistance",
@@ -79,6 +86,8 @@ PRIVILEGED: frozenset[str] = frozenset(
         "delegation:manage",
         "connector:manage",
         "connector:secret:write",
+        "correlation:manage",
+        "sla:manage",
         "ai:admin",
         "action:approve",
         "playbook:publish",
@@ -93,8 +102,17 @@ ADMIN_PORTAL_ANY: frozenset[str] = frozenset(
     {"tenant:read", "user:read", "role:read", "apikey:read", "audit:read", "delegation:read"}
 )
 
-_NOC_READ = {"portal:noc", "alert:read", "incident:read", "asset:read", "search:read", "ai:use"}
-_SOC_READ = {"portal:soc", "alert:read", "incident:read", "asset:read", "search:read", "ai:use"}
+_NOC_READ = {
+    "portal:noc",
+    "alert:read",
+    "incident:read",
+    "asset:read",
+    "service:read",
+    "maintenance:read",
+    "search:read",
+    "ai:use",
+}
+_SOC_READ = {"portal:soc", "alert:read", "incident:read", "asset:read", "service:read", "search:read", "ai:use"}
 
 
 @dataclass(frozen=True)
@@ -136,10 +154,13 @@ SYSTEM_ROLES: tuple[SystemRole, ...] = (
                 "alert:update",
                 "alert:suppress",
                 "asset:update",
+                "service:manage",
+                "maintenance:manage",
                 "incident:create",
                 "incident:update",
                 "incident:comment",
                 "incident:escalate",
+                "incident:sync",
                 "playbook:read",
                 "playbook:edit",
                 "playbook:run",
@@ -172,6 +193,7 @@ SYSTEM_ROLES: tuple[SystemRole, ...] = (
                 "incident:update",
                 "incident:comment",
                 "incident:escalate",
+                "incident:sync",
                 "vuln:read",
                 "vuln:update",
                 "playbook:read",
@@ -203,6 +225,8 @@ SYSTEM_ROLES: tuple[SystemRole, ...] = (
                 "incident:update",
                 "incident:comment",
                 "incident:escalate",
+                "incident:sync",
+                "maintenance:read",
                 "action:read",
                 "action:request",
                 "action:approve",

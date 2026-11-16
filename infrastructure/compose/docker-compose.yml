@@ -296,17 +296,22 @@ services:
       NOCSOC_DATABASE_HOST: postgres
       NOCSOC_KAFKA_BOOTSTRAP: redpanda:9092
       NOCSOC_CLICKHOUSE_HOST: clickhouse
-    # Least privilege: the RLS-bound worker role and the INSERT-only ClickHouse user.
+      NOCSOC_VALKEY_HOST: valkey
+    # Least privilege: the RLS-bound worker role and the INSERT-only ClickHouse user. Valkey
+    # carries live-update notifications and per-tenant ingest quotas.
     secrets:
       - source: worker_database_password
         target: nocsoc_worker_database_password
       - source: clickhouse_ingest_password
         target: nocsoc_clickhouse_ingest_password
+      - source: valkey_password
+        target: nocsoc_valkey_password
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
     depends_on:
       migrate-stream: { condition: service_completed_successfully }
+      valkey: { condition: service_healthy }
     mem_limit: 384m
 
   connector-runner:

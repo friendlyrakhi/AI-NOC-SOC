@@ -2,14 +2,15 @@ id: servicenow.itsm
 name: ServiceNow ITSM
 vendor: ServiceNow
 category: itsm
-version: 0.1.0
+version: 0.2.0
 sdk: ">=1.0,<2.0"
 certification: sandbox
-docs_reference: "ServiceNow Table API: incident and cmdb_ci_server; business-rule outbound REST"
+docs_reference: "ServiceNow Table API: incident, cmdb_ci_server, cmdb_ci_service with cmdb_rel_ci relations; business-rule outbound REST"
 auth_types: [basic, oauth2]
 streams:
   - {name: incidents, output: ticket@1, default_interval_seconds: 120}
   - {name: cmdb_servers, output: asset@1, default_interval_seconds: 3600}
+  - {name: cmdb_services, output: service@1, default_interval_seconds: 3600}
 webhook: true
 actions:
   - {key: itsm.create_incident, tier: T1}

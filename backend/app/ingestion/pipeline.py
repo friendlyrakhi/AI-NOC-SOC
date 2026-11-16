@@ -18,7 +18,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, ClassVar, Literal
@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.db.engines import AppDatabase
 from app.events import EVENT_COLUMNS, to_event_row
+from app.incidents import engine
 from app.ingestion.limits import MAX_DEPTH, MAX_RECORD_BYTES, json_depth
 from app.streaming import Envelope
 from nocsoc_connector_sdk import (
@@ -40,6 +41,7 @@ from nocsoc_connector_sdk import (
     RawRecord,
     SchemaDriftError,
     SecurityEventV1,
+    ServiceV1,
     TicketV1,
     VulnFindingV1,
 )
@@ -56,7 +58,10 @@ ASSET_TYPE_BY_REF = {"hostname": "host", "fqdn": "host", "ip": "host", "cloud_id
 class Outcome:
     result: Result
     reason: str = ""
+    tenant: UUID | None = None
     alerts: list[str] = field(default_factory=list)
+    incidents: list[str] = field(default_factory=list)
+    suppressed: list[str] = field(default_factory=list)
     telemetry: dict[str, list[list[Any]]] = field(default_factory=dict)
 
 
@@ -87,7 +92,14 @@ def _ch_dt(value: datetime) -> datetime:
 
 
 class Ingestor:
-    def __init__(self, db: AppDatabase, analytics: Any | None = None, database: str = "nocsoc") -> None:
+    def __init__(
+        self,
+        db: AppDatabase,
+        analytics: Any | None = None,
+        database: str = "nocsoc",
+        quota: Callable[[UUID], Awaitable[bool]] | None = None,
+    ) -> None:
+        self.quota = quota
         self.db = db
         self.analytics = analytics
         self.database = database
@@ -101,6 +113,8 @@ class Ingestor:
             return Outcome("dead_letter", dl.reason)
         try:
             owner = await self._verify_owner(env)
+            if self.quota is not None and not await self.quota(owner):
+                raise DeadLetterError("quota_exceeded", "tenant ingest quota exceeded for this minute")
             records = self._normalize(env)
         except DeadLetterError as dl:
             tenant = env.tenantid if dl.reason != "ownership_mismatch" else None
@@ -108,6 +122,7 @@ class Ingestor:
             return Outcome("dead_letter", dl.reason)
 
         outcome = await self._store(env, owner, records)
+        outcome.tenant = owner
         if outcome.result == "stored" and self.analytics is not None:
             await self._write_telemetry(env, owner, outcome.telemetry)
         return outcome
@@ -193,7 +208,9 @@ class Ingestor:
             ).scalar_one_or_none()
             if inserted is None:
                 return Outcome("duplicate")
+            changes = engine.Changes()
             source_id = str(env.data.get("source_id", ""))
+            new_alerts: list[tuple[str, bool]] = []
             for index, rec in enumerate(records):
                 event = to_event_row(
                     rec,
@@ -207,9 +224,16 @@ class Ingestor:
                 if event is not None:
                     outcome.telemetry.setdefault("events", []).append(event)
                 if isinstance(rec, AlertV1):
-                    alert_id = await self._upsert_alert(conn, env, rec, source_id)
-                    if alert_id:
-                        outcome.alerts.append(alert_id)
+                    upserted = await self._upsert_alert(conn, env, rec, source_id)
+                    if upserted:
+                        outcome.alerts.append(upserted[0])
+                        new_alerts.append(upserted)
+                elif isinstance(rec, ServiceV1):
+
+                    async def resolve(refs: Sequence[AssetRef], _conn: AsyncConnection = conn) -> UUID | None:
+                        return await self._resolve_asset(_conn, env, refs)
+
+                    await engine.sync_service(conn, rec, env.instanceid, resolve)
                 elif isinstance(rec, AssetV1):
                     await self._resolve_asset(
                         conn, env, rec.identifiers, rec.type, rec.name, rec.environment, rec.attributes
@@ -250,7 +274,12 @@ class Ingestor:
                         ]
                     )
                 elif isinstance(rec, TicketV1):
-                    pass  # canonical event only; ITSM sync arrives with incidents (P3)
+                    await engine.apply_ticket(conn, rec, env.instanceid, changes)
+            # Correlation after all records of the message are stored (topology first).
+            for alert_id, inserted in new_alerts:
+                await engine.after_alert(conn, alert_id, inserted=inserted, changes=changes)
+            outcome.incidents = sorted(changes.incidents)
+            outcome.suppressed = changes.suppressed
             observed = env.data.get("observed_at")
             outcome.telemetry.setdefault("raw_events", []).append(
                 [
@@ -345,7 +374,10 @@ class Ingestor:
             )
         return asset_id
 
-    async def _upsert_alert(self, conn: AsyncConnection, env: Envelope, a: AlertV1, source_id: str) -> str | None:
+    async def _upsert_alert(
+        self, conn: AsyncConnection, env: Envelope, a: AlertV1, source_id: str
+    ) -> tuple[str, bool] | None:
+        """(alert id, newly inserted). A de-duplicated repeat returns inserted = False."""
         fp = fingerprint(env.connector, a.dedup_key)
         if a.status == "resolved":
             # A source-side resolve closes the open alert with that fingerprint, if any.
@@ -359,7 +391,7 @@ class Ingestor:
                     {"f": fp, "o": a.observed_at},
                 )
             ).scalar_one_or_none()
-            return str(row) if row else None
+            return (str(row), False) if row else None
         asset_id = await self._resolve_asset(conn, env, a.asset_refs)
         row = (
             await conn.execute(
@@ -381,7 +413,7 @@ ON CONFLICT (tenant_id, fingerprint) WHERE status NOT IN ('resolved', 'closed') 
   raw_ref = EXCLUDED.raw_ref,
   updated_at = now(),
   version = alerts.version + 1
-RETURNING id
+RETURNING id, (xmax = 0) AS inserted
 """
                 ),
                 {
@@ -403,8 +435,8 @@ RETURNING id
                     "raw": source_id,
                 },
             )
-        ).scalar_one()
-        return str(row)
+        ).one()
+        return str(row.id), bool(row.inserted)
 
     async def _upsert_vuln(self, conn: AsyncConnection, env: Envelope, v: VulnFindingV1) -> None:
         asset_id = await self._resolve_asset(conn, env, v.asset_refs)

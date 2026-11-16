@@ -73,7 +73,11 @@ def alert_rows(s: StreamEnv, slug: str = "globex") -> dict[str, tuple[int, str]]
         return {
             r[0]: (r[1], r[2])
             for r in c.execute(
-                "SELECT fingerprint, occurrence_count, status FROM alerts WHERE tenant_id = %s", (s.env.tenants[slug],)
+                # Open alerts only: de-duplication applies to open alerts, and a closed alert may
+                # share its fingerprint with a newer open one.
+                "SELECT fingerprint, occurrence_count, status FROM alerts "
+                "WHERE tenant_id = %s AND status NOT IN ('resolved', 'closed')",
+                (s.env.tenants[slug],),
             )
         }
 

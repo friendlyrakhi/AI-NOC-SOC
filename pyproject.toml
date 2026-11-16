@@ -68,6 +68,8 @@ known-first-party = ["app", "nocsoc_connector_sdk", "nocsoc_connectors", "connec
 "backend/app/alerts/**" = ["S608"]
 "backend/app/integrations/**" = ["S608"]
 "backend/app/events.py" = ["S608"]
+"backend/app/incidents/**" = ["S608"]
+"backend/app/topology.py" = ["S608"]
 # Vendor-shaped sandbox payload literals read best on one line each.
 "connectors/catalog/src/nocsoc_connectors/**" = ["E501"]
 

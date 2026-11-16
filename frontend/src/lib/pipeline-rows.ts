@@ -10,6 +10,8 @@ type AlertOut = components["schemas"]["AlertOut"];
 type VulnOut = components["schemas"]["VulnOut"];
 type InstanceOut = components["schemas"]["InstanceOut"];
 type DefinitionOut = components["schemas"]["DefinitionOut"];
+type IncidentOut = components["schemas"]["IncidentOut"];
+type ServiceOut = components["schemas"]["ServiceOut"];
 
 export const SANDBOX_SOURCE = "sandbox connector";
 
@@ -20,7 +22,8 @@ export function pipelineAlertRow(a: AlertOut): Row {
     severity: a.severity,
     status: a.status,
     asset: a.asset?.name ?? null,
-    service: a.service_hint ?? null,
+    service: a.service?.name ?? a.service_hint ?? null,
+    incident: a.incident?.number ?? null,
     technique: a.mitre_techniques.join(", ") || null,
     source: a.connector_id,
     count: a.occurrence_count,
@@ -31,7 +34,9 @@ export function pipelineAlertRow(a: AlertOut): Row {
       Severity: a.severity,
       Status: a.status.replace(/_/g, " "),
       Asset: a.asset ? `${a.asset.name} (${a.asset.type})` : null,
-      Service: a.service_hint ?? null,
+      Service: a.service?.name ?? a.service_hint ?? null,
+      Incident: a.incident ? `${a.incident.number} (${a.incident.status})` : null,
+      Suppressed: a.suppression_reason ?? null,
       Source: `${a.connector_id} (${SANDBOX_SOURCE}; simulated vendor data)`,
       "Source alert ID": a.source_alert_id,
       "ATT&CK techniques": a.mitre_techniques.join(", ") || null,
@@ -110,5 +115,73 @@ export function instanceRow(i: InstanceOut, definitions: DefinitionOut[]): Row {
     status: INSTANCE_STATUS[i.status].label,
     lastSuccess: i.last_success_at ?? null,
     detail: i.status_detail ?? null,
+  };
+}
+
+// ---------------------------------------------------------------- P3: incidents and services
+export const pipelineIncidentColumns: ColumnSpec[] = [
+  { key: "number", header: "Incident", type: "mono" },
+  { key: "title", header: "Title" },
+  { key: "domain", header: "Domain", filter: true, hideOnMobile: true },
+  { key: "severity", header: "Severity", type: "severity", filter: true },
+  { key: "priority", header: "Priority", filter: true },
+  { key: "status", header: "Status", type: "state", filter: true },
+  { key: "services", header: "Impacted services", hideOnMobile: true },
+  { key: "alerts", header: "Alerts", type: "number", align: "right", hideOnMobile: true },
+  { key: "sla", header: "SLA", filter: true, hideOnMobile: true },
+  { key: "detectedAt", header: "Detected", type: "relative" },
+];
+
+export function slaLabel(i: IncidentOut): string {
+  if (i.sla.ack_breached || i.sla.resolve_breached) return "Breached";
+  return i.resolved_at ? "Met" : "Within SLA";
+}
+
+export function pipelineIncidentRow(i: IncidentOut): Row {
+  return {
+    _id: i.id,
+    _href: `/incidents/${i.id}`,
+    number: i.number,
+    title: i.title,
+    domain: i.domain.toUpperCase(),
+    severity: i.severity,
+    priority: i.priority,
+    status: i.status,
+    services: i.services.map((s) => s.name).join(", ") || null,
+    alerts: i.alert_count,
+    sla: slaLabel(i),
+    detectedAt: i.detected_at,
+  };
+}
+
+export const SERVICE_HEALTH: Record<ServiceOut["health"], "healthy" | "degraded" | "down"> = {
+  healthy: "healthy",
+  degraded: "degraded",
+  down: "down",
+};
+
+export const serviceColumns: ColumnSpec[] = [
+  { key: "name", header: "Service" },
+  { key: "tier", header: "Tier", filter: true },
+  { key: "health", header: "Health", type: "health", filter: true },
+  { key: "openIncidents", header: "Open incidents", type: "number", align: "right" },
+  { key: "openAlerts", header: "Open alerts", type: "number", align: "right", hideOnMobile: true },
+  { key: "assets", header: "Hosts / dependencies", hideOnMobile: true },
+  { key: "owner", header: "Owner", filter: true, hideOnMobile: true },
+  { key: "maintenance", header: "Maintenance", filter: true, hideOnMobile: true },
+];
+
+export function serviceRow(s: ServiceOut): Row {
+  return {
+    _id: s.id,
+    _href: `/noc/topology/${s.id}`,
+    name: s.name,
+    tier: `Tier ${s.tier}`,
+    health: SERVICE_HEALTH[s.health],
+    openIncidents: s.open_incidents,
+    openAlerts: s.open_alerts,
+    assets: `${s.members} / ${s.dependencies}`,
+    owner: s.owner_team ?? null,
+    maintenance: s.in_maintenance ? "In maintenance" : "No",
   };
 }

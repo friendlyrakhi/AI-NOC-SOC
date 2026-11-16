@@ -1,6 +1,7 @@
 import { CorrelationGroups } from "@/components/correlation-groups";
 import { DataTable } from "@/components/data-table";
 import { DemoBadge, DemoNotice, SandboxBadge, SandboxNotice } from "@/components/indicators";
+import { LiveRefresh } from "@/components/live-refresh";
 import { gate } from "@/components/page-states";
 import { Tabs } from "@/components/tabs";
 import { PageHeader } from "@/components/ui";
@@ -28,7 +29,7 @@ export default async function NocAlertsPage() {
         <DataTable
           caption="NOC alerts ingested from sandbox connectors"
           rows={(ingested?.items ?? []).map(pipelineAlertRow)}
-          columns={alertColumns(false)}
+          columns={[...alertColumns(false), { key: "incident", header: "Incident", type: "mono", hideOnMobile: true }]}
           searchPlaceholder="Search alert, asset, service…"
           exportName="noc-alerts-sandbox"
           emptyText={
@@ -80,7 +81,8 @@ export default async function NocAlertsPage() {
         title="Alerts & correlation"
         description="Operational alerts after de-duplication, and the groups the correlation engine formed from them."
         actions={
-          <span className="flex gap-2">
+          <span className="flex items-center gap-2">
+            {!aggregate && <LiveRefresh topics={["alert.upserted"]} />}
             {hasIngested && <SandboxBadge />}
             <DemoBadge />
           </span>

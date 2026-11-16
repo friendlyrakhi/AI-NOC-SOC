@@ -100,6 +100,12 @@ erDiagram
 | `alert_state_changes` | id, tenant_id, alert_id, from_status, to_status, actor, reason, at | |
 | `suppression_rules` | id, tenant_id, match jsonb, reason, expires_at, created_by | |
 
+**As built in P3 (migration 0003):**
+- **Topology:** `services` (name, tier, owner_team, aliases, external_ref) and `service_assets` (role `member` or `dependency`) come from the ServiceNow sandbox CMDB stream (`ServiceV1`, SDK 1.1). A service's dependencies stand in for `asset_relations`; a general asset graph is deferred.
+- **Alerts:** `alerts` gains `service_id`, `suppression_reason` and a generated `search` tsvector.
+- **Incidents:** `incidents` adds `merged_into_id` (correlation merged it; it is closed and excluded from KPIs), `created_by_type` and a `search` tsvector. `incident_counters` allocates per-tenant numbers.
+- **Per-tenant settings:** `sla_policies` and `correlation_overrides` hold one row per tenant; defaults live in code, so no table needs rows without a tenant.
+
 ### 2.6 Incidents
 | Table | Key columns | Notes |
 |-------|-------------|-------|

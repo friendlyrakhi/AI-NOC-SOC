@@ -10,7 +10,9 @@ import { TECHNIQUES } from "@/lib/demo/reference";
 import type { Incident, TimelineEntry } from "@/lib/demo/types";
 import { formatTime, minutes } from "@/lib/format";
 import { alertColumns, alertRow, assetColumns, assetRow } from "@/lib/rows";
+import { IncidentDetail } from "@/components/incident-detail";
 import { getDemo } from "@/lib/server/demo";
+import { getIncidentDetail, isUuid } from "@/lib/server/pipeline";
 
 const KIND_LABEL: Record<TimelineEntry["kind"], string> = {
   detected: "Detected",
@@ -109,6 +111,9 @@ export default async function IncidentPage({ params }: { params: Promise<{ id: s
   const { me, data } = await getDemo();
   const denied = gate(me, "incident:read", "Incident");
   if (denied) return denied;
+  // Real incidents (correlation or analyst) first; DEMO incidents keep their own ids.
+  const real = isUuid(id) ? await getIncidentDetail(id) : null;
+  if (real) return <IncidentDetail me={me} {...real} />;
   const incident = data.incidents.find((i) => i.id === id);
   if (!incident) notFound();
   const now = Date.parse(data.generatedAt) + 30 * 60000;

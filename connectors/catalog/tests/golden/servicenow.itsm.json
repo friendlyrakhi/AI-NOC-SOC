@@ -67,5 +67,75 @@
       "source_id": "c74da4cc4717efa2c80b84aab50742db"
     },
     "stream": "cmdb_servers"
+  },
+  {
+    "normalized": [
+      {
+        "aliases": [
+          "file-share"
+        ],
+        "depends_on": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-core-sw-02"
+          },
+          {
+            "kind": "hostname",
+            "value": "t87d9-rtr-wan-01"
+          }
+        ],
+        "external_id": "015d9d17af6d167ac18544e0b1cf9b69",
+        "kind": "service",
+        "members": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-win-01"
+          }
+        ],
+        "name": "File Services",
+        "observed_at": "2026-11-16T11:10:00Z",
+        "owner_team": "Workplace",
+        "tier": 3
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:10:00Z",
+      "payload": {
+        "busines_criticality": "3 - less critical",
+        "name": "File Services",
+        "owned_by": {
+          "display_value": "Workplace"
+        },
+        "relations": [
+          {
+            "child": {
+              "display_value": "t87d9-win-01",
+              "sys_class_name": "cmdb_ci"
+            },
+            "type": "Runs on::Runs"
+          },
+          {
+            "child": {
+              "display_value": "t87d9-core-sw-02",
+              "sys_class_name": "cmdb_ci"
+            },
+            "type": "Depends on::Used by"
+          },
+          {
+            "child": {
+              "display_value": "t87d9-rtr-wan-01",
+              "sys_class_name": "cmdb_ci"
+            },
+            "type": "Depends on::Used by"
+          }
+        ],
+        "sys_id": "015d9d17af6d167ac18544e0b1cf9b69",
+        "sys_updated_on": "2026-11-16 11:10:00",
+        "u_app_aliases": "file-share"
+      },
+      "schema": "servicenow.cmdb_ci_service@1",
+      "source_id": "015d9d17af6d167ac18544e0b1cf9b69"
+    },
+    "stream": "cmdb_services"
   }
 ]

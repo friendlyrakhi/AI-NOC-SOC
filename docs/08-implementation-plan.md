@@ -112,12 +112,12 @@ Deliverables:
 - NOC portal: Overview, Alerts, Incidents, Topology, Infrastructure, Maintenance. SOC portal: Overview, Triage, Cases, Vulnerabilities, Entities. Postgres FTS-based global search.
 - Playwright E2E for critical journeys.
 
-**Exit criteria:**
-- [ ] Scenario 1 → single NOC incident with correct impacted service; Scenario 4 → **joint** incident visible in both portals.
-- [ ] Correlation precision ≥ 0.9 / recall ≥ 0.8 on seeded scenarios.
-- [ ] MTTA/MTTR computed correctly in tests.
-- [ ] Alert-to-UI latency < 5 s; queue smooth at 10k rows.
-- [ ] axe: no serious/critical violations on P3 pages.
+**Exit criteria:** (status: [reports/P3-exit-review.md](reports/P3-exit-review.md))
+- [x] Scenario 1 → single NOC incident with correct impacted service; Scenario 4 → **joint** incident visible in both portals.
+- [x] Correlation precision ≥ 0.9 / recall ≥ 0.8 on seeded scenarios (1.0 / 1.0, in 40 shuffled arrival orders).
+- [x] MTTA/MTTR computed correctly in tests.
+- [~] Alert-to-UI latency < 5 s (measured in E2E); queue at 10k rows not yet load-tested (see the report).
+- [x] axe: no serious/critical violations on P3 pages.
 
 ---
 

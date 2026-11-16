@@ -57,7 +57,7 @@ export default async function SiemPage() {
                         <DataTable
                           caption="Security alerts ingested from sandbox connectors"
                           rows={ingested.items.map(pipelineAlertRow)}
-                          columns={alertColumns(false, true)}
+                          columns={[...alertColumns(false, true), { key: "incident", header: "Incident", type: "mono", hideOnMobile: true }]}
                           searchPlaceholder="Search alert, host, technique…"
                           exportName="soc-alerts-sandbox"
                           emptyText="No security alerts ingested yet. Add a sandbox integration or replay a scenario under Connectors."

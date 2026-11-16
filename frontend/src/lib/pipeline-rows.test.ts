@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import type { components } from "@/lib/api/schema";
-import { INSTANCE_STATUS, instanceRow, pipelineAlertRow, pipelineVulnRow } from "@/lib/pipeline-rows";
+import {
+  INSTANCE_STATUS,
+  instanceRow,
+  pipelineAlertRow,
+  pipelineIncidentRow,
+  pipelineVulnRow,
+  serviceRow,
+  slaLabel,
+} from "@/lib/pipeline-rows";
 
 type S = components["schemas"];
 
@@ -94,5 +102,68 @@ describe("pipeline rows", () => {
     expect(row.connector).toBe("Wazuh");
     expect(row.status).toBe("Degraded");
     expect(row.mode).toBe("SANDBOX");
+  });
+});
+
+const incident: S["IncidentOut"] = {
+  id: "00000000-0000-0000-0000-0000000000a1",
+  number: "INC-000007",
+  domain: "joint",
+  title: "Encoded PowerShell from Office macro on fs-01",
+  summary: "",
+  severity: "critical",
+  priority: "P1",
+  status: "investigating",
+  commander_id: null,
+  assignee_id: null,
+  services: [{ id: "00000000-0000-0000-0000-0000000000b1", name: "File Services", tier: 3 }],
+  detected_at: "2026-11-16T10:00:00Z",
+  acknowledged_at: "2026-11-16T10:05:00Z",
+  resolved_at: null,
+  closed_at: null,
+  created_by_type: "correlation",
+  alert_count: 5,
+  sla: { ack_due_at: "2026-11-16T10:15:00Z", resolve_due_at: "2026-11-16T14:00:00Z", ack_breached: false, resolve_breached: false },
+  external_tickets: [],
+  sandbox: true,
+  updated_at: "2026-11-16T10:05:00Z",
+  version: 3,
+};
+
+describe("incident and service rows", () => {
+  it("maps a correlated joint incident with its services and SLA state", () => {
+    const row = pipelineIncidentRow(incident);
+    expect(row).toMatchObject({ _href: `/incidents/${incident.id}`, domain: "JOINT", services: "File Services", alerts: 5, sla: "Within SLA" });
+    expect(slaLabel({ ...incident, sla: { ...incident.sla, resolve_breached: true } })).toBe("Breached");
+    expect(slaLabel({ ...incident, resolved_at: "2026-11-16T11:00:00Z" })).toBe("Met");
+  });
+
+  it("shows a service's health only as derived from open alerts", () => {
+    const row = serviceRow({
+      id: "00000000-0000-0000-0000-0000000000b1",
+      name: "Payments",
+      tier: 1,
+      owner_team: "Payments Platform",
+      aliases: ["payments-api"],
+      members: 2,
+      dependencies: 4,
+      open_alerts: 3,
+      open_incidents: 1,
+      worst_open_severity: "critical",
+      health: "down",
+      in_maintenance: false,
+      sandbox: true,
+    });
+    expect(row).toMatchObject({ health: "down", tier: "Tier 1", assets: "2 / 4", maintenance: "No" });
+  });
+
+  it("links pipeline alerts to their incident and service", () => {
+    const row = pipelineAlertRow({
+      ...alert,
+      service: { id: "00000000-0000-0000-0000-0000000000b1", name: "Identity (SSO)" },
+      incident: { id: incident.id, number: "INC-000007", status: "open" },
+      suppression_reason: null,
+    });
+    expect(row).toMatchObject({ incident: "INC-000007", service: "Identity (SSO)" });
   });
 });

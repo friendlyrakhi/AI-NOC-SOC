@@ -33,12 +33,13 @@ from nocsoc_connector_sdk.models import (
     Observable,
     RawRecord,
     SecurityEventV1,
+    ServiceV1,
     TicketV1,
     VulnFindingV1,
 )
 from nocsoc_connector_sdk.sandbox import GridStream, Simulator, World, iso, parse_ts, seeded
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 __all__ = [
     "ActionInvocation",
@@ -70,6 +71,7 @@ __all__ = [
     "RawRecord",
     "SchemaDriftError",
     "SecurityEventV1",
+    "ServiceV1",
     "Simulator",
     "TicketV1",
     "TransientError",

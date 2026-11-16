@@ -67,7 +67,8 @@ test.describe("NOC portal", () => {
   test("incident drill-down shows timeline, cited AI RCA and simulated response", async ({ page }) => {
     await signIn(page, NOC_ENGINEER);
     await page.goto("/incidents");
-    await page.getByRole("table", { name: "Incidents" }).getByRole("link").first().click();
+    await page.getByRole("tab", { name: /DEMO incidents/ }).click();
+    await page.getByRole("table", { name: "Incidents (DEMO)" }).getByRole("link").first().click();
     await expect(page.getByRole("tab", { name: /Timeline/ })).toHaveAttribute("aria-selected", "true");
     await page.getByRole("tab", { name: "Root cause (AI)" }).click();
     await expect(page.getByText("AI draft (demo) · not confirmed")).toBeVisible();

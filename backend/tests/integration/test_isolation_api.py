@@ -68,7 +68,46 @@ def initech_ids(api: Api) -> dict[str, str]:
             "'high', now(), now()) RETURNING id",
             (api.env.tenants["initech"],),
         ).fetchone()[0]
+        asset_id = c.execute(
+            "INSERT INTO assets (tenant_id, type, name) VALUES (%s, 'host', 'initech-host') RETURNING id",
+            (api.env.tenants["initech"],),
+        ).fetchone()[0]
+        service_id = c.execute(
+            "INSERT INTO services (tenant_id, name) VALUES (%s, 'Initech Billing') RETURNING id",
+            (api.env.tenants["initech"],),
+        ).fetchone()[0]
+    incident = api.post(
+        INITECH_ADMIN,
+        "/incidents",
+        {"title": "Initech private incident", "domain": "noc", "severity": "high", "alert_ids": [str(alert_id)]},
+    )
+    assert incident.status_code == 201, incident.text
+    task = api.post(INITECH_ADMIN, f"/incidents/{incident.json()['id']}/tasks", {"title": "Initech task"})
+    assert task.status_code == 201, task.text
+    window = api.post(
+        INITECH_ADMIN,
+        "/maintenance-windows",
+        {
+            "title": "Initech window",
+            "service_ids": [str(service_id)],
+            "starts_at": "2030-01-01T00:00:00Z",
+            "ends_at": "2030-01-01T02:00:00Z",
+        },
+    )
+    assert window.status_code == 201, window.text
+    rule = api.post(
+        INITECH_ADMIN,
+        "/suppression-rules",
+        {"name": "Initech rule", "match": {"connector": "prometheus"}, "reason": "noise"},
+    )
+    assert rule.status_code == 201, rule.text
     return {
+        "incident_id": incident.json()["id"],
+        "task_id": task.json()["id"],
+        "asset_id": str(asset_id),
+        "service_id": str(service_id),
+        "window_id": window.json()["id"],
+        "rule_id": rule.json()["id"],
         "instance_id": instance.json()["id"],
         "alert_id": str(alert_id),
         "key": "core_switch_failure",  # a scenario key: replaying it may only ever touch the caller's tenant
@@ -98,6 +137,24 @@ def _initech_snapshot(api: Api) -> tuple:  # type: ignore[type-arg]
             ).fetchall(),
             c.execute("SELECT id, status, version FROM alerts WHERE tenant_id = %s ORDER BY id", (t,)).fetchall(),
             c.execute("SELECT count(*) FROM connector_runs WHERE tenant_id = %s", (t,)).fetchall(),
+            c.execute(
+                "SELECT id, status, domain, priority, assignee_id, version FROM incidents "
+                "WHERE tenant_id = %s ORDER BY id",
+                (t,),
+            ).fetchall(),
+            c.execute("SELECT count(*) FROM timeline_entries WHERE tenant_id = %s", (t,)).fetchall(),
+            c.execute(
+                "SELECT alert_id, incident_id FROM incident_alerts WHERE tenant_id = %s ORDER BY 1", (t,)
+            ).fetchall(),
+            c.execute(
+                "SELECT id, status, version FROM incident_tasks WHERE tenant_id = %s ORDER BY id", (t,)
+            ).fetchall(),
+            c.execute("SELECT count(*) FROM external_tickets WHERE tenant_id = %s", (t,)).fetchall(),
+            c.execute(
+                "SELECT id, cancelled_at FROM maintenance_windows WHERE tenant_id = %s ORDER BY id", (t,)
+            ).fetchall(),
+            c.execute("SELECT id, enabled FROM suppression_rules WHERE tenant_id = %s ORDER BY id", (t,)).fetchall(),
+            c.execute("SELECT id, name, version FROM services WHERE tenant_id = %s ORDER BY id", (t,)).fetchall(),
         )
 
 

@@ -71,3 +71,73 @@ export async function getInstanceDetail(id: string): Promise<{
     deadLetters: deadLetters ?? [],
   };
 }
+
+// ---------------------------------------------------------------- P3: incidents and topology
+export type IncidentOut = Schemas["IncidentOut"];
+export type IncidentPage = Schemas["IncidentPage"];
+export type IncidentMetrics = Schemas["MetricsOut"];
+export type TimelineEntry = Schemas["TimelineOut"];
+export type IncidentTask = Schemas["TaskOut"];
+export type LinkedAlert = Schemas["LinkedAlert"];
+export type ServiceOut = Schemas["ServiceOut"];
+export type ServiceDetail = Schemas["ServiceDetail"];
+export type MaintenanceWindow = Schemas["MaintenanceOut"];
+export type SuppressionRule = Schemas["SuppressionOut"];
+export type CorrelationRule = Schemas["RuleOut"];
+export type SearchOut = Schemas["SearchOut"];
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isUuid(id: string): boolean {
+  return UUID.test(id);
+}
+
+export function getIncidents(portal?: "noc" | "soc", limit = 200): Promise<IncidentPage | null> {
+  return optional<IncidentPage>(`/incidents?limit=${limit}&sort=priority${portal ? `&portal=${portal}` : ""}`);
+}
+
+export function getIncidentMetrics(portal?: "noc" | "soc", days = 30): Promise<IncidentMetrics | null> {
+  return optional<IncidentMetrics>(`/incidents/metrics?days=${days}${portal ? `&portal=${portal}` : ""}`);
+}
+
+export async function getIncidentDetail(id: string): Promise<{
+  incident: IncidentOut;
+  alerts: LinkedAlert[];
+  timeline: TimelineEntry[];
+  tasks: IncidentTask[];
+} | null> {
+  if (!isUuid(id)) return null;
+  const incident = await optional<IncidentOut>(`/incidents/${id}`);
+  if (!incident) return null;
+  const [alerts, timeline, tasks] = await Promise.all([
+    optional<LinkedAlert[]>(`/incidents/${id}/alerts`),
+    optional<TimelineEntry[]>(`/incidents/${id}/timeline?limit=500`),
+    optional<IncidentTask[]>(`/incidents/${id}/tasks`),
+  ]);
+  return { incident, alerts: alerts ?? [], timeline: timeline ?? [], tasks: tasks ?? [] };
+}
+
+export function getServices(): Promise<ServiceOut[] | null> {
+  return optional<ServiceOut[]>("/services");
+}
+
+export function getService(id: string): Promise<ServiceDetail | null> {
+  return isUuid(id) ? optional<ServiceDetail>(`/services/${id}`) : Promise.resolve(null);
+}
+
+export async function getOperationsControls(): Promise<{
+  windows: MaintenanceWindow[] | null;
+  rules: SuppressionRule[] | null;
+  correlation: CorrelationRule[] | null;
+}> {
+  const [windows, rules, correlation] = await Promise.all([
+    optional<MaintenanceWindow[]>("/maintenance-windows?include_past=true"),
+    optional<SuppressionRule[]>("/suppression-rules"),
+    optional<CorrelationRule[]>("/correlation-rules"),
+  ]);
+  return { windows, rules, correlation };
+}
+
+export function searchPipeline(q: string): Promise<SearchOut | null> {
+  return q.trim().length >= 2 ? optional<SearchOut>(`/search?q=${encodeURIComponent(q.trim())}&limit=30`) : Promise.resolve(null);
+}

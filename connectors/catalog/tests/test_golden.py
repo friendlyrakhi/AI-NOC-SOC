@@ -76,6 +76,6 @@ if __name__ == "__main__" and "--regen" in sys.argv:
     GOLDEN.mkdir(exist_ok=True)
     for cid in sorted(REGISTRY):
         (GOLDEN / f"{cid}.json").write_text(
-            json.dumps(expected(cid), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            json.dumps(expected(cid), indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
         )
         print("wrote", cid)

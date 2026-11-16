@@ -185,7 +185,23 @@ class TicketV1(_Model):
     observed_at: datetime
 
 
-NormalizedRecord = AlertV1 | AssetV1 | VulnFindingV1 | SecurityEventV1 | MetricPointV1 | TicketV1
+class ServiceV1(_Model):
+    """A business service from a CMDB (SDK 1.1). ``members`` run the service; ``depends_on`` is
+    infrastructure it needs (network, databases). ``aliases`` are application names that
+    monitoring tools use as service hints."""
+
+    kind: Literal["service"] = "service"
+    external_id: str = Field(min_length=1, max_length=128)
+    name: str = Field(min_length=1, max_length=200)
+    tier: int = Field(default=3, ge=1, le=4)
+    owner_team: str | None = Field(default=None, max_length=100)
+    aliases: list[str] = Field(default_factory=list, max_length=20)
+    members: list[AssetRef] = Field(default_factory=list, max_length=200)
+    depends_on: list[AssetRef] = Field(default_factory=list, max_length=100)
+    observed_at: datetime
+
+
+NormalizedRecord = AlertV1 | AssetV1 | VulnFindingV1 | SecurityEventV1 | MetricPointV1 | TicketV1 | ServiceV1
 
 
 # ------------------------------------------------------------------ actions

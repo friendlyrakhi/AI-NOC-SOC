@@ -4,6 +4,7 @@ import { DemoBadge, SeverityBadge } from "@/components/indicators";
 import { gate } from "@/components/page-states";
 import { Card, PageHeader } from "@/components/ui";
 import { getDemo } from "@/lib/server/demo";
+import { searchPipeline } from "@/lib/server/pipeline";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -24,12 +25,27 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
   const term = q.toLowerCase();
   const match = (...fields: (string | null | undefined)[]) => fields.some((f) => f?.toLowerCase().includes(term));
   const has = (p: string) => me.permissions.includes(p);
+  const real = term && me.mode !== "aggregate" ? await searchPipeline(q) : null;
+  const HREF: Record<string, (id: string) => string> = {
+    incident: (id) => `/incidents/${id}`,
+    service: (id) => `/noc/topology/${id}`,
+    asset: () => "/noc/topology",
+    alert: () => "/noc/alerts",
+  };
+  const realHits: Hit[] = (real?.hits ?? []).map((h) => ({
+    key: `${h.kind}-${h.id}`,
+    title: h.title,
+    meta: `${h.kind} · ${h.subtitle}`,
+    href: HREF[h.kind](h.id),
+    severity: (h.severity ?? undefined) as Hit["severity"],
+  }));
 
   const groups: { title: string; hits: Hit[] }[] = !term
     ? []
     : [
+        { title: "Ingested data (SANDBOX)", hits: realHits },
         {
-          title: "Incidents",
+          title: "Incidents (DEMO)",
           hits: has("incident:read")
             ? data.incidents
                 .filter((i) => match(i.number, i.title, i.service))
@@ -37,7 +53,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
             : [],
         },
         {
-          title: "Assets",
+          title: "Assets (DEMO)",
           hits: has("asset:read")
             ? data.assets
                 .filter((a) => match(a.name, a.ip, a.service, a.kind))
@@ -45,7 +61,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
             : [],
         },
         {
-          title: "Alerts",
+          title: "Alerts (DEMO)",
           hits: has("alert:read")
             ? data.alerts
                 .filter((a) => match(a.title, a.assetName))
@@ -59,7 +75,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
             : [],
         },
         {
-          title: "Indicators",
+          title: "Indicators (DEMO)",
           hits: has("alert:read")
             ? data.indicators
                 .filter((i) => match(i.value, i.actor))
@@ -67,7 +83,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
             : [],
         },
         {
-          title: "Vulnerabilities",
+          title: "Vulnerabilities (DEMO)",
           hits: has("vuln:read")
             ? data.vulns
                 .filter((v) => match(v.cve, v.title, v.assetName))

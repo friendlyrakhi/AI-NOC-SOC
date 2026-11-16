@@ -118,6 +118,13 @@ Legend: **Perm** = required permission. (P#) = phase delivered.
 | GET/POST/PATCH | `/correlation-rules[/{id}]` | `correlation:manage` |
 | GET/POST | `/sla-policies` | `sla:manage` |
 
+**As built in P3:**
+- **Incidents:** `GET/POST /incidents` (filters `portal=noc|soc`, which includes joint incidents, plus `domain`, `status[]`, `priority[]`, `open_only` and full-text `q`; offset pagination), `GET /incidents/metrics` (MTTA, MTTR, SLA attainment), `GET/PATCH /incidents/{id}`, `POST /incidents/{id}/status`, `/escalate`, `/comments`, `/external-tickets`, `GET/POST /incidents/{id}/alerts`, `DELETE /incidents/{id}/alerts/{alert_id}`, `GET /incidents/{id}/timeline?after=`, and `GET/POST/PATCH` tasks.
+- **Correlation and SLA:** `GET /correlation-rules` and `PATCH /correlation-rules/{key}` (built-in rules with per-tenant enable/window overrides, step-up). `GET/PUT /sla-policy` (per-tenant targets over code defaults, step-up).
+- **Topology and operations:** `GET /services`, `GET /services/{id}`, `GET /assets/{id}`, `GET/POST /maintenance-windows`, `DELETE /maintenance-windows/{id}` (cancel), `GET/POST /suppression-rules`, `DELETE /suppression-rules/{id}` (disable), `GET /search?q=` (Postgres full-text search over incidents, alerts, assets and services, filtered by permission), and `GET /stream` (SSE, tenant-scoped, ids and types only).
+- **Alerts:** `GET /alerts` gains `service_id`, `asset_id` and `in_incident` filters, and each alert carries `service`, `incident` and `suppression_reason`.
+- **Deferred:** incident merge and PIR endpoints arrive with P4 (correlation merges automatically in P3). Vulnerability triage endpoints (below) remain P3 follow-ups.
+
 ### 2.7 Vulnerabilities (P3)
 | Method | Path | Perm |
 |--------|------|------|

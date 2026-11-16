@@ -15,12 +15,15 @@ from app.core.tenancy.platform import router as platform_router
 from app.core.tenancy.router import router as tenancy_router
 from app.events import router as events_router
 from app.health import router as health_router
+from app.incidents.router import router as incidents_router
 from app.integrations.internal import router as internal_router
 from app.integrations.router import router as integrations_router
+from app.live import router as live_router
 from app.logging_setup import RequestContextMiddleware, configure_logging
 from app.mail import Mailer
 from app.services import build_services
 from app.telemetry import setup_telemetry
+from app.topology import router as topology_router
 
 API_PREFIX = "/api/v1"
 
@@ -62,6 +65,9 @@ def create_app(settings: Settings | None = None, *, mailer: Mailer | None = None
         platform_router,
         integrations_router,
         alerts_router,
+        incidents_router,
+        topology_router,
+        live_router,
         events_router,
         internal_router,
     ):

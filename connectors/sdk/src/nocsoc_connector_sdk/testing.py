@@ -25,6 +25,7 @@ OUTPUT_KIND = {
     "security_event@1": "security_event",
     "metric@1": "metric",
     "ticket@1": "ticket",
+    "service@1": "service",
 }
 FIXED_NOW = datetime(2026, 11, 16, 12, 0, tzinfo=UTC)
 
