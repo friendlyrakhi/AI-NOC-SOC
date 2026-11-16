@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -46,9 +47,25 @@ export async function signIn(page: Page, email: string): Promise<void> {
   await page.getByRole("button", { name: "Sign in" }).click();
   if (user.totp_secret) {
     await expect(page).toHaveURL(/\/login\/mfa/);
-    // The next time step is also accepted, and avoids replaying a code used moments ago.
-    await page.getByLabel("Code").fill(totp(user.totp_secret, 1));
+    resetTotpReplay(user.email);
+    await page.getByLabel("Code").fill(totp(user.totp_secret));
     await page.getByRole("button", { name: "Verify" }).click();
   }
   await expect(page).not.toHaveURL(/\/login/);
+}
+
+/**
+ * Dev-stack test helper: clears the TOTP replay marker so a user can sign in more than once
+ * within one 30-second window (same approach as the backend test harness). Never use
+ * against anything but the local dev database.
+ */
+export function resetTotpReplay(email: string): void {
+  const sql = `UPDATE user_credentials SET last_used_step = NULL WHERE kind = 'totp' AND user_id = (SELECT id FROM users WHERE email = '${email.replace(/'/g, "")}')`;
+  execFileSync("docker", [
+    "exec",
+    "nocsoc-postgres-1",
+    "sh",
+    "-c",
+    `PGPASSWORD="$(cat /run/secrets/postgres_password)" psql -q -U postgres -d nocsoc -h 127.0.0.1 -c "${sql}"`,
+  ]);
 }

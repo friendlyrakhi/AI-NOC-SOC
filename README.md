@@ -4,7 +4,9 @@ A multi-tenant platform with separate **AI NOC** and **AI SOC** portals, a share
 
 > **Status: Phase 1 (platform core: identity, MSP tenancy, RBAC, audit, portal shell).** Development build with **mock data only**. No live integrations exist, and remediation is simulated (`NOCSOC_EXECUTION_MODE=live` is rejected at startup).
 
-Design docs: [docs/](docs/README.md) · Decisions: [docs/adr/](docs/adr/README.md) · Plan: [docs/08-implementation-plan.md](docs/08-implementation-plan.md)
+Design docs: [docs/](docs/README.md) · Decisions: [docs/adr/](docs/adr/README.md) · Plan: [docs/08-implementation-plan.md](docs/08-implementation-plan.md) · Frontend guide: [frontend/README.md](frontend/README.md)
+
+> The full operations UI (Command Center, NOC, SOC, incidents, automation, connectors, reports) is built and runs on clearly labelled **DEMO** data until phases P2–P6 deliver real data. See [docs/reports/frontend-demo-ui.md](docs/reports/frontend-demo-ui.md).
 
 ## Prerequisites
 

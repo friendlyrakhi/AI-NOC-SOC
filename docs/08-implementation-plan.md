@@ -6,6 +6,8 @@ Principles:
 - **Each phase starts with a short design check-in** with you, and ends with a demo plus exit-criteria review. I will not start the next phase without your go-ahead.
 - Effort is given as relative size (S/M/L/XL), not calendar dates. Calendar time depends on how much you want to review each step.
 
+> **Change (2026-11-16, at your request):** the complete frontend was built ahead of P2–P6 on clearly labelled DEMO data ([reports/frontend-demo-ui.md](reports/frontend-demo-ui.md)). Those phases still deliver the real data; their UI work shrinks to swapping each page's demo source for the API.
+
 ## Phase overview
 
 ```mermaid

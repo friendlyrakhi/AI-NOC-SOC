@@ -9,9 +9,9 @@ import { cookies } from "next/headers";
 const SESSION_COOKIE = "nocsoc_session";
 const CHALLENGE_COOKIE = "nocsoc_challenge";
 
-// Dev runs over plain http on 127.0.0.1. TLS (and Secure cookies) arrive with the
-// hardened profile in P7, so this must be explicitly disabled for local http.
-const secure = process.env.NOCSOC_COOKIE_SECURE !== "false";
+// Production builds use Secure cookies unless explicitly disabled (the local container runs
+// over plain http on 127.0.0.1 until TLS arrives in P7). `next dev` is always plain http.
+const secure = process.env.NODE_ENV === "production" && process.env.NOCSOC_COOKIE_SECURE !== "false";
 
 export async function getSessionToken(): Promise<string | undefined> {
   return (await cookies()).get(SESSION_COOKIE)?.value;

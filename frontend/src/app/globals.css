@@ -15,6 +15,28 @@
   --danger: #f87171;
   --success: #4ade80;
   --primary: #3b82f6;
+  /* Solid fills behind white text (>= 4.5:1). */
+  --primary-solid: #2563eb;
+  /* Charts: validated categorical slots (dataviz reference palette, dark steps) */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #0ca30c;
+  --grid: #243040;
+  --axis: #3a4656;
+  /* Status palette (fixed, never themed): always paired with an icon + label */
+  --status-critical: #d03b3b;
+  --status-serious: #ec835a;
+  --status-warning: #fab219;
+  --status-good: #0ca30c;
+  /* Sequential (blue) ramp for heatmaps */
+  --seq-1: #184f95;
+  --seq-2: #256abf;
+  --seq-3: #3987e5;
+  --seq-4: #6da7ec;
+  --seq-5: #9ec5f4;
 }
 
 @media (prefers-color-scheme: light) {
@@ -32,6 +54,20 @@
     --danger: #b91c1c;
     --success: #15803d;
     --primary: #1d4ed8;
+    --primary-solid: #1d4ed8;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+    --series-5: #e87ba4;
+    --series-6: #008300;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --seq-1: #b7d3f6;
+    --seq-2: #86b6ef;
+    --seq-3: #5598e7;
+    --seq-4: #2a78d6;
+    --seq-5: #1c5cab;
   }
 }
 
@@ -45,10 +81,15 @@
   --color-danger: var(--danger);
   --color-success: var(--success);
   --color-primary: var(--primary);
+  --color-primary-solid: var(--primary-solid);
   --color-accent-noc: var(--accent-noc);
   --color-accent-soc: var(--accent-soc);
   --color-accent-command: var(--accent-command);
   --color-accent-admin: var(--accent-admin);
+  --color-critical: var(--status-critical);
+  --color-serious: var(--status-serious);
+  --color-caution: var(--status-warning);
+  --color-good: var(--status-good);
   --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
 }
@@ -69,7 +110,7 @@ body {
     @apply focus-visible:ring-primary/50 outline-none focus-visible:ring-2 disabled:opacity-50;
   }
   .btn-primary {
-    @apply bg-primary text-white hover:opacity-90;
+    @apply bg-primary-solid text-white hover:opacity-90;
   }
   .btn-danger {
     @apply bg-danger/15 text-danger border-danger/40 border hover:bg-danger/25;
@@ -77,4 +118,13 @@ body {
   .btn-ghost {
     @apply text-muted hover:text-foreground hover:bg-border/40;
   }
+}
+
+/* Respect reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / 0.55);
 }

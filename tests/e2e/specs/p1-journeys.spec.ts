@@ -30,7 +30,7 @@ test("session cookie is HttpOnly and SameSite=Strict", async ({ page }) => {
 test("MSP analyst sees only delegated customers and the read-only All customers view", async ({ page }) => {
   await signIn(page, "msp.noc@acme.example");
   await expect(page).toHaveURL(/\/noc$/);
-  await expect(page.getByRole("link", { name: "AI SOC" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Portals" }).getByRole("link", { name: "AI SOC" })).toHaveCount(0);
 
   const switcher = page.getByLabel("Tenant");
   const options = await switcher.locator("option").allTextContents();
@@ -39,9 +39,9 @@ test("MSP analyst sees only delegated customers and the read-only All customers 
 
   await switcher.selectOption({ label: "Acme Managed Services: All customers (read-only)" });
   await expect(page.getByText("All customers · read-only")).toBeVisible();
-  const customers = page.locator("section", { hasText: "Customers (" });
-  await expect(customers.getByRole("cell", { name: /Globex Corporation/ })).toBeVisible();
-  await expect(customers.getByText("Initech")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "AI NOC: all customers" })).toBeVisible();
+  // Only delegated customers appear, never Initech.
+  await expect(page.getByRole("main")).not.toContainText("Initech");
 
   await switcher.selectOption({ label: "Globex Corporation (via MSP)" });
   await expect(page.getByText("Delegated access")).toBeVisible();
@@ -49,7 +49,7 @@ test("MSP analyst sees only delegated customers and the read-only All customers 
 
 test("customer admin signs in with MFA and administers only their tenant", async ({ page }) => {
   await signIn(page, "admin@globex.example");
-  await page.getByRole("link", { name: "Administration" }).click();
+  await page.getByRole("navigation", { name: "Portals" }).getByRole("link", { name: "Admin" }).click();
   await expect(page.getByRole("heading", { name: "Tenant" })).toBeVisible();
   await expect(page.locator("dd", { hasText: "Globex Corporation" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Customers" })).toHaveCount(0);

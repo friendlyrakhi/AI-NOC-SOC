@@ -1,5 +1,7 @@
 # 07 — UI Navigation & Screen Inventory
 
+> **Implementation status (2026-11-16):** all screens below are built (see [reports/frontend-demo-ui.md](reports/frontend-demo-ui.md)). Operational screens run on labelled **DEMO** data until their backend phases deliver real data. Administration runs on the real API. The shipped route map is in `frontend/README.md`. Differences from this plan: the NOC portal adds dedicated Servers, Network, Cloud operations, Applications (APM) and Databases screens plus RCA and SLA reporting; the SOC portal adds VAPT and a MITRE ATT&CK matrix; shared areas live under *Operations* (Incidents, Automation, Connectors, Reports).
+
 ## 1. Shell
 
 One Next.js application with four route groups and separate layouts: `(noc)`, `(soc)`, `(command)`, `(admin)`. They feel like distinct portals (own navigation, accent color, landing page) and share the shell, design system, auth and Copilot. Splitting into separate apps later is a build change, not a rewrite (see Decision D3).
