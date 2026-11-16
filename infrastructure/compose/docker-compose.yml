@@ -1,0 +1,161 @@
+# Unified AI NOC & SOC platform: local development stack.
+# Profiles (docs/02-architecture.md §7). Only `core` exists in P0. Later phases add
+# stream (P2), analytics (P2), ai (P4), workflow (P5), search (P6), observability (P7).
+#
+# Rules (threat model T27/T30): every published port binds to 127.0.0.1, no privileged
+# containers, no Docker socket mounts, secrets come from files and never from env values.
+# scripts/check-compose.py enforces these in CI.
+#
+# Use scripts/dev.ps1 (or dev.sh) rather than calling compose directly.
+
+name: nocsoc
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+
+services:
+  postgres:
+    <<: *hardening
+    profiles: [core]
+    # pgvector 0.8.7 on PostgreSQL 17.12
+    image: pgvector/pgvector@sha256:b513c48566e4777cd3370451400000c78eda6a08131d68f4c31d4a76f27bd8fd
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: nocsoc
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+    secrets: [postgres_password, database_password]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../config/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:${NOCSOC_PG_PORT:-5432}:5432"
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - max_connections=100
+      - -c
+      - log_connections=on
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nocsoc -h 127.0.0.1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 1g
+
+  valkey:
+    <<: *hardening
+    profiles: [core]
+    # Valkey 8.1.11
+    image: valkey/valkey@sha256:2602ace2be6569bc2bbb06f873776516ab9089821525be34f4305c67eb9db02a
+    secrets: [valkey_password]
+    # Password goes into a tmpfs config file, not the process arguments.
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        umask 077 &&
+        printf 'requirepass %s\n' "$$(cat /run/secrets/valkey_password)" > /tmp/valkey.conf &&
+        exec valkey-server /tmp/valkey.conf
+        --maxmemory 256mb --maxmemory-policy allkeys-lru
+        --save "" --appendonly no --protected-mode yes
+    tmpfs: [/tmp]
+    ports:
+      - "127.0.0.1:${NOCSOC_VALKEY_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "VALKEYCLI_AUTH=\"$$(cat /run/secrets/valkey_password)\" REDISCLI_AUTH=\"$$(cat /run/secrets/valkey_password)\" valkey-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 320m
+
+  mailpit:
+    <<: *hardening
+    profiles: [core]
+    # Mailpit 1.33.1: dev email sink, nothing leaves the machine.
+    image: axllent/mailpit@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
+    ports:
+      - "127.0.0.1:${NOCSOC_MAIL_UI_PORT:-8025}:8025"
+      - "127.0.0.1:${NOCSOC_SMTP_PORT:-1025}:1025"
+    mem_limit: 128m
+
+  api:
+    <<: *hardening
+    profiles: [core]
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/api.Dockerfile
+      secrets: [build_extra_ca]
+    image: nocsoc/api:dev
+    environment:
+      NOCSOC_ENVIRONMENT: dev
+      NOCSOC_EXECUTION_MODE: simulate
+      NOCSOC_DATABASE_HOST: postgres
+      NOCSOC_DATABASE_NAME: nocsoc
+      NOCSOC_DATABASE_USER: nocsoc_app
+      NOCSOC_VALKEY_HOST: valkey
+    # File names carry the settings prefix: pydantic-settings maps NOCSOC_<FIELD> to them.
+    secrets:
+      - source: database_password
+        target: nocsoc_database_password
+      - source: valkey_password
+        target: nocsoc_valkey_password
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    depends_on:
+      postgres: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:${NOCSOC_API_PORT:-8100}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    mem_limit: 512m
+
+  web:
+    <<: *hardening
+    profiles: [core]
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/web.Dockerfile
+      secrets: [build_extra_ca]
+    image: nocsoc/web:dev
+    environment:
+      NOCSOC_API_INTERNAL_URL: http://api:8000
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/frontend/.next/cache:uid=1000,gid=1000,mode=0700
+    cap_drop: [ALL]
+    depends_on:
+      api: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:${NOCSOC_WEB_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    mem_limit: 512m
+
+secrets:
+  # Build-time only: extra root CA for TLS-inspecting antivirus/proxies (see infrastructure/certs).
+  build_extra_ca:
+    file: ../certs/extra-ca.pem
+  postgres_password:
+    file: ../secrets/postgres_password
+  database_password:
+    file: ../secrets/database_password
+  valkey_password:
+    file: ../secrets/valkey_password
+
+volumes:
+  pgdata:

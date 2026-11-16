@@ -1,0 +1,13 @@
+[project]
+name = "nocsoc-connector-runner"
+version = "0.1.0"
+description = "Connector runtime service (P2)"
+requires-python = ">=3.12,<3.13"
+dependencies = ["nocsoc-connector-sdk"]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/connector_runner"]

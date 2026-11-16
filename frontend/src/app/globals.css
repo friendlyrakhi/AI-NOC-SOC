@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+/* Dark-first operations theme (docs/07-ui-navigation.md §1). */
+:root {
+  --background: #0b0f14;
+  --surface: #121821;
+  --border: #243040;
+  --foreground: #e6edf3;
+  --muted: #8b98a8;
+  --accent-noc: #2dd4bf;
+  --accent-soc: #a78bfa;
+  --accent-command: #f59e0b;
+  --accent-admin: #94a3b8;
+  --warning: #f59e0b;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --background: #f7f9fb;
+    --surface: #ffffff;
+    --border: #d5dde6;
+    --foreground: #0f172a;
+    --muted: #526070;
+    --accent-noc: #0f766e;
+    --accent-soc: #6d28d9;
+    --accent-command: #b45309;
+    --accent-admin: #475569;
+    --warning: #b45309;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-warning: var(--warning);
+  --color-accent-noc: var(--accent-noc);
+  --color-accent-soc: var(--accent-soc);
+  --color-accent-command: var(--accent-command);
+  --color-accent-admin: var(--accent-admin);
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}

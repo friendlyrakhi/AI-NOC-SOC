@@ -1,0 +1,13 @@
+[project]
+name = "nocsoc-ai-gateway"
+version = "0.1.0"
+description = "Model-agnostic AI gateway (P4)"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_gateway"]

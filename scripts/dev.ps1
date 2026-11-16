@@ -1,0 +1,67 @@
+<#
+.SYNOPSIS
+  Runs the local stack.
+.EXAMPLE
+  scripts\dev.ps1 up                     # core profile
+  scripts\dev.ps1 up -Profiles core,stream -Build
+  scripts\dev.ps1 status                 # containers + memory use
+  scripts\dev.ps1 logs api
+  scripts\dev.ps1 down
+  scripts\dev.ps1 reset                  # down + DELETE volumes (asks first)
+#>
+[CmdletBinding()]
+param(
+    [Parameter(Position = 0)][ValidateSet('up', 'down', 'reset', 'logs', 'status', 'build')]
+    [string]$Command = 'status',
+    [Parameter(Position = 1)][string]$Service,
+    [string[]]$Profiles = @('core'),
+    [switch]$Build,
+    [switch]$Force
+)
+$ErrorActionPreference = 'Stop'
+. "$PSScriptRoot\lib.ps1"
+
+$root = Get-RepoRoot
+if (-not (Test-Path (Join-Path $root '.env')) -or -not (Test-Path (Join-Path $root 'infrastructure\secrets\database_password'))) {
+    throw 'Not bootstrapped. Run scripts\bootstrap.ps1 first.'
+}
+
+$compose = Get-ComposeArgs
+$profileArgs = @()
+foreach ($p in $Profiles) { $profileArgs += @('--profile', $p) }
+# Teardown and inspection cover every profile, so nothing is left running.
+$allProfiles = @('--profile', '*')
+
+switch ($Command) {
+    'up' {
+        $upArgs = @('up', '-d', '--wait')
+        if ($Build) { $upArgs += '--build' }
+        Write-Step "starting profiles: $($Profiles -join ', ')"
+        Invoke-Checked docker @compose @profileArgs @upArgs
+        & docker @compose @allProfiles ps
+        Write-Host ''
+        Write-Host 'Web:     http://127.0.0.1:3000'
+        Write-Host 'API:     http://127.0.0.1:8100/api/v1/docs'
+        Write-Host 'Mailpit: http://127.0.0.1:8025'
+    }
+    'build' { Invoke-Checked docker @compose @profileArgs build }
+    'down' { Invoke-Checked docker @compose @allProfiles down }
+    'reset' {
+        if (-not $Force) {
+            $answer = Read-Host 'This deletes ALL local data volumes (Postgres etc.). Type "reset" to continue'
+            if ($answer -ne 'reset') { Write-Host 'Cancelled.'; return }
+        }
+        Invoke-Checked docker @compose @allProfiles down -v --remove-orphans
+    }
+    'logs' {
+        $logArgs = @('logs', '-f', '--tail', '200')
+        if ($Service) { $logArgs += $Service }
+        & docker @compose @allProfiles @logArgs
+    }
+    'status' {
+        & docker @compose @allProfiles ps
+        Write-Host ''
+        & docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}' `
+            $(docker @compose @allProfiles ps -q)
+    }
+}

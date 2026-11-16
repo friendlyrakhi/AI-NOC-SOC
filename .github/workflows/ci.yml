@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.8"
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Bootstrap (generated dev secrets, no install)
+        run: scripts/bootstrap.sh --skip-install
+
+      - name: Install
+        run: |
+          uv sync --frozen
+          pnpm install --frozen-lockfile
+
+      - name: Gates
+        run: scripts/ci.sh
+
+      - name: Secret scan of full git history
+        run: >
+          docker run --rm -v "$PWD:/repo"
+          zricethezav/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git /repo --no-banner --redact --config /repo/.gitleaks.toml
+
+      - name: Build images
+        run: docker compose -f infrastructure/compose/docker-compose.yml --env-file .env --profile core build
