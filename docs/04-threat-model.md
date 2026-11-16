@@ -74,7 +74,7 @@ Data that crosses into TB3/TB5 from TB1, TB4 or TB7 is **untrusted**, including 
 |---|-----------------|------------|------|
 | T1 | Credential stuffing/brute force (S) | Argon2id; per-account and per-IP rate limits in Valkey; lockout with backoff; MFA mandatory for privileged roles | SEC-AUTH-01 |
 | T2 | Session hijack via XSS (S/I) | HttpOnly+Secure+SameSite=Strict cookies; strict CSP (nonce-based), no `dangerouslySetInnerHTML` on telemetry; React escaping; Trusted Types where feasible | SEC-WEB-01 (CSP header test), SEC-WEB-02 (XSS payload corpus rendered from alert fields) |
-| T3 | CSRF on BFF mutations (T) | SameSite=Strict + double-submit CSRF token on all non-GET BFF routes; Origin check | SEC-WEB-03 |
+| T3 | CSRF on BFF mutations (T) | SameSite=Strict session cookie; all mutations are POST-only Server Actions with the framework's Origin/Host check (ADR-0017) | SEC-WEB-03 |
 | T4 | JWT forgery/confusion (S) | Asymmetric signing (EdDSA), `alg` pinned, `aud`/`iss` checked, 5-minute expiry, key rotation via JWKS | SEC-AUTH-02 |
 | T5 | Repudiation of approvals (R) | Step-up MFA at approval; audit with hash chain; approval records immutable | SEC-AUD-01 |
 
@@ -150,6 +150,9 @@ Data that crosses into TB3/TB5 from TB1, TB4 or TB7 is **untrusted**, including 
 
 | Risk | Why accepted now | Revisit |
 |------|------------------|---------|
+| Deleting the **newest** audit entries (tail truncation) is not detectable from the chain alone; modified or missing middle entries are | Needs anchors stored outside the database | P7: exported anchors (already planned) |
+| A user granted a privileged role mid-session cannot step up until they enroll MFA at next sign-in | Login enforces enrollment; no privilege is gained without MFA for step-up actions | P7 review |
+| Dev cookies are not `Secure` over local http | Loopback only, mock data | P7 TLS profile |
 | Dev master key on local disk | Single-user PC, mock data only | Before any real credential is stored (Phase 8) → OpenBao/KMS |
 | No TLS between containers in `core` profile | Localhost Docker network, mock data | Hardened profile in Phase 7 |
 | Local accounts instead of enterprise IdP | Simplicity | OIDC (Entra ID/Keycloak) in Phase 7 |

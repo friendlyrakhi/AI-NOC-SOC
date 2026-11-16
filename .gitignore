@@ -40,3 +40,7 @@ Thumbs.db
 
 # local build CA bundle (see infrastructure/certs/README.md)
 infrastructure/certs/*.pem
+
+# Playwright
+test-results/
+playwright-report/

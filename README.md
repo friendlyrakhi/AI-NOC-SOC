@@ -2,7 +2,7 @@
 
 A multi-tenant platform with separate **AI NOC** and **AI SOC** portals, a shared evidence-grounded AI engine, a universal connector framework, incident management, approval-gated automation and an executive command center.
 
-> **Status: Phase 0 (foundations).** Development build with **mock data and sandbox connectors only**. No live integrations exist, and remediation is simulated (`NOCSOC_EXECUTION_MODE=live` is rejected at startup).
+> **Status: Phase 1 (platform core: identity, MSP tenancy, RBAC, audit, portal shell).** Development build with **mock data only**. No live integrations exist, and remediation is simulated (`NOCSOC_EXECUTION_MODE=live` is rejected at startup).
 
 Design docs: [docs/](docs/README.md) · Decisions: [docs/adr/](docs/adr/README.md) · Plan: [docs/08-implementation-plan.md](docs/08-implementation-plan.md)
 
@@ -22,9 +22,12 @@ Run `scripts\doctor.ps1` to check your machine.
 
 ```powershell
 scripts\bootstrap.ps1          # dev secrets, .env, build CA bundle, uv sync, pnpm install
-scripts\dev.ps1 up -Build      # core profile: postgres, valkey, mailpit, api, web
+scripts\dev.ps1 up -Build      # core profile: postgres, migrate, valkey, mailpit, api, web
+scripts\dev.ps1 seed           # mock MSP + 2 customers + users -> infrastructure/secrets/dev-users.json
+scripts\dev.ps1 totp admin@globex.example   # current MFA code for a seeded user
 scripts\dev.ps1 status         # containers + memory
-scripts\ci.ps1                 # all CI gates locally
+scripts\ci.ps1                 # all CI gates locally (integration tests need Docker)
+pnpm e2e                       # browser journeys against the running stack (uses installed Edge)
 scripts\dev.ps1 down
 ```
 
@@ -34,9 +37,20 @@ On Linux or macOS, use `scripts/bootstrap.sh`, `scripts/dev.sh` and `scripts/ci.
 |-----|------|
 | http://127.0.0.1:3000 | Web (portal shell) |
 | http://127.0.0.1:8100/api/v1/docs | API docs (OpenAPI) |
-| http://127.0.0.1:8025 | Mailpit (dev email sink) |
+| http://127.0.0.1:8025 | Mailpit (dev email sink; invitations land here) |
 
 All ports bind to `127.0.0.1` and can be changed in `.env`.
+
+### Seeded accounts (after `scripts\dev.ps1 seed`)
+
+| Tenant | Accounts | Notes |
+|--------|----------|-------|
+| Acme Managed Services (MSP) | `msp.admin@`, `msp.noc@`, `msp.soc@`, `msp.exec@acme.example` | Reach customers only through delegations. MSP members get the read-only "All customers" view. |
+| Globex Corporation (customer) | `admin@`, `noc@`, `auditor@globex.example` | |
+| Initech (customer) | `admin@`, `soc@initech.example` | |
+| Platform | `platform.admin@nocsoc.example` | Manages tenants; cannot read tenant data. |
+
+Passwords and TOTP secrets are random for each seed run and are stored only in `infrastructure/secrets/dev-users.json` (git-ignored). Privileged roles require MFA.
 
 ## Frontend development with hot reload
 

@@ -8,73 +8,58 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Annotated
 
-import psycopg
-import redis.asyncio as redis
 from fastapi import APIRouter, Depends, Response, status
+from sqlalchemy import text
 
-from app.config import Settings, get_settings
+from app.core.authz.deps import public
+from app.services import Services, get_services
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/health", tags=["health"])
 
-Check = Callable[[Settings], Awaitable[None]]
+Check = Callable[[Services], Awaitable[None]]
 
 
-async def check_postgres(settings: Settings) -> None:
-    password = settings.database_password.get_secret_value() if settings.database_password else None
-    conn = await psycopg.AsyncConnection.connect(
-        host=settings.database_host,
-        port=settings.database_port,
-        dbname=settings.database_name,
-        user=settings.database_user,
-        password=password,
-        connect_timeout=max(1, int(settings.readiness_timeout_seconds)),
-    )
-    async with conn:
-        await conn.execute("SELECT 1")
+async def check_postgres(services: Services) -> None:
+    async with services.app_db.engine.connect() as conn:
+        await conn.execute(text("SELECT 1"))
 
 
-async def check_valkey(settings: Settings) -> None:
-    password = settings.valkey_password.get_secret_value() if settings.valkey_password else None
-    client = redis.Redis(
-        host=settings.valkey_host,
-        port=settings.valkey_port,
-        password=password,
-        socket_timeout=settings.readiness_timeout_seconds,
-    )
-    try:
-        await client.ping()
-    finally:
-        await client.aclose()
+async def check_identity_db(services: Services) -> None:
+    async with services.auth_db.engine.connect() as conn:
+        await conn.execute(text("SELECT 1"))
+
+
+async def check_valkey(services: Services) -> None:
+    await services.valkey.ping()
 
 
 def get_checks() -> dict[str, Check]:
-    return {"postgres": check_postgres, "valkey": check_valkey}
+    return {"postgres": check_postgres, "identity_db": check_identity_db, "valkey": check_valkey}
 
 
-@router.get("/live")
+@router.get("/live", **public())
 async def live() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@router.get("/ready")
+@router.get("/ready", **public())
 async def ready(
     response: Response,
-    settings: Annotated[Settings, Depends(get_settings)],
+    services: Annotated[Services, Depends(get_services)],
     checks: Annotated[dict[str, Check], Depends(get_checks)],
 ) -> dict[str, str]:
+    timeout = services.settings.readiness_timeout_seconds
     names = list(checks)
     results = await asyncio.gather(
-        *(
-            asyncio.wait_for(checks[n](settings), settings.readiness_timeout_seconds + 1)
-            for n in names
-        ),
+        *(asyncio.wait_for(checks[n](services), timeout) for n in names),
         return_exceptions=True,
     )
-    failed = [n for n, r in zip(names, results, strict=True) if isinstance(r, BaseException)]
+    failed = False
     for name, result in zip(names, results, strict=True):
         if isinstance(result, BaseException):
+            failed = True
             logger.warning("readiness check %s failed: %s", name, type(result).__name__)
     if failed:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE

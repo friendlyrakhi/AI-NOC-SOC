@@ -15,8 +15,7 @@ const nextConfig: NextConfig = {
   // pnpm workspace root, so standalone tracing includes hoisted deps.
   outputFileTracingRoot: path.join(__dirname, ".."),
   poweredByHeader: false,
-  cacheComponents: true,
-  partialPrefetching: true,
+  // Every page is authenticated and per-user, so pages render dynamically (ADR-0017).
   turbopack: {
     root: path.join(__dirname, ".."),
     rules: {

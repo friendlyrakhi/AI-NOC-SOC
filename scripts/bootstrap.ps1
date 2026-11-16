@@ -24,7 +24,7 @@ function New-HexSecret([int]$Bytes = 32) {
     return -join ($buf | ForEach-Object { $_.ToString('x2') })
 }
 
-foreach ($name in 'postgres_password', 'database_password', 'valkey_password') {
+foreach ($name in 'postgres_password', 'database_password', 'auth_database_password', 'valkey_password', 'master_key') {
     $path = Join-Path $secretsDir $name
     if ((Test-Path $path) -and -not $RotateSecrets) {
         Write-Step "secret $name exists (kept)"

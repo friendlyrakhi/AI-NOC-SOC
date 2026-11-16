@@ -34,6 +34,8 @@ RUN groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app 
 COPY --from=build --chown=root:root /src/.venv /src/.venv
 # The application runs from source (no wheel build needed); files are root-owned and read-only.
 COPY --chown=root:root backend/app /src/backend/app
+COPY --chown=root:root backend/migrations /src/backend/migrations
+COPY --chown=root:root backend/alembic.ini /src/backend/alembic.ini
 ENV PATH="/src/.venv/bin:$PATH" PYTHONPATH=/src/backend PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /src/backend
 USER 10001

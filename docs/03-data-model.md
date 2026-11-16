@@ -1,7 +1,7 @@
 # 03 — Data Model
 
 Conventions (PostgreSQL):
-- Primary keys are `uuid` (UUIDv7, time-ordered) named `id`.
+- Primary keys are `uuid` named `id`. P1 uses `gen_random_uuid()` (v4); PostgreSQL 17 has no native UUIDv7. Switch when PostgreSQL 18 or an extension is adopted.
 - Every tenant-owned table has `tenant_id uuid NOT NULL` + RLS policy + composite indexes leading with `tenant_id`.
 - `created_at`, `updated_at timestamptz`; `version int` for optimistic concurrency (ETag).
 - Soft delete only where business-required (`deleted_at`); audit and timeline are never deleted by the app.
@@ -46,6 +46,8 @@ erDiagram
 ```
 
 ## 2. PostgreSQL tables
+
+> **Implemented in P1** (migration `0001`): tenants, users, user_credentials, sessions, auth_challenges, memberships, invitations, permissions, roles, role_permissions, role_bindings, delegations, api_keys, audit_log. The `secrets` table arrives with connector credentials in P2 (P1 encrypts TOTP seeds in `user_credentials` with the envelope provider). `tenant_admin` holds every permission (MSP-only ones are inert in customer tenants). Database roles: ADR-0018.
 
 ### 2.1 Identity & tenancy (`core`)
 

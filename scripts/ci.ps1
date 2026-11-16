@@ -28,7 +28,8 @@ try {
     Gate 'mypy'        { Invoke-Uv run mypy }
     Gate 'imports'     { Invoke-Uv run lint-imports }
     Gate 'bandit'      { Invoke-Uv run bandit -q -c pyproject.toml -r backend/app connectors ai-engine automation }
-    Gate 'pytest'      { Invoke-Uv run pytest -q }
+    Gate 'pytest'      { Invoke-Uv run pytest -q }  # includes integration tests (Docker required)
+    Gate 'openapi'     { Push-Location backend; try { Invoke-Uv run python -m app.tools.export_openapi --check } finally { Pop-Location } }
     Gate 'pip-audit'   {
         $req = Join-Path $env:TEMP 'nocsoc-requirements.txt'
         Invoke-Uv export --frozen --no-dev --no-emit-workspace --no-hashes -o $req -q

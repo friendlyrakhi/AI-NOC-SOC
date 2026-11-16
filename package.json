@@ -10,6 +10,7 @@
     "web:build": "pnpm --filter frontend build",
     "web:lint": "pnpm --filter frontend lint",
     "web:typecheck": "pnpm --filter frontend typecheck",
-    "web:test": "pnpm --filter frontend test"
+    "web:test": "pnpm --filter frontend test",
+    "e2e": "pnpm --filter nocsoc-e2e test"
   }
 }

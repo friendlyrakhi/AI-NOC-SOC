@@ -12,6 +12,9 @@
   --accent-command: #f59e0b;
   --accent-admin: #94a3b8;
   --warning: #f59e0b;
+  --danger: #f87171;
+  --success: #4ade80;
+  --primary: #3b82f6;
 }
 
 @media (prefers-color-scheme: light) {
@@ -26,6 +29,9 @@
     --accent-command: #b45309;
     --accent-admin: #475569;
     --warning: #b45309;
+    --danger: #b91c1c;
+    --success: #15803d;
+    --primary: #1d4ed8;
   }
 }
 
@@ -36,6 +42,9 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-primary: var(--primary);
   --color-accent-noc: var(--accent-noc);
   --color-accent-soc: var(--accent-soc);
   --color-accent-command: var(--accent-command);
@@ -48,4 +57,24 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+@layer components {
+  .input {
+    @apply bg-background border-border text-foreground rounded-md border px-2.5 py-1.5 text-sm outline-none;
+    @apply focus-visible:border-primary focus-visible:ring-primary/40 focus-visible:ring-2;
+  }
+  .btn {
+    @apply inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors;
+    @apply focus-visible:ring-primary/50 outline-none focus-visible:ring-2 disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-primary text-white hover:opacity-90;
+  }
+  .btn-danger {
+    @apply bg-danger/15 text-danger border-danger/40 border hover:bg-danger/25;
+  }
+  .btn-ghost {
+    @apply text-muted hover:text-foreground hover:bg-border/40;
+  }
 }

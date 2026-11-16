@@ -42,9 +42,7 @@ def check(config: dict) -> list[str]:
                 problems.append(f"{name}: secret-like env var {key}; use a secret file")
         if "no-new-privileges:true" not in (svc.get("security_opt") or []):
             problems.append(f"{name}: missing security_opt no-new-privileges:true")
-        if not svc.get("mem_limit") and not svc.get("deploy", {}).get("resources", {}).get(
-            "limits", {}
-        ).get("memory"):
+        if not svc.get("mem_limit") and not svc.get("deploy", {}).get("resources", {}).get("limits", {}).get("memory"):
             problems.append(f"{name}: no memory limit")
     return problems
 

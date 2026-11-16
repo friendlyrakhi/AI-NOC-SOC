@@ -8,10 +8,12 @@
   scripts\dev.ps1 logs api
   scripts\dev.ps1 down
   scripts\dev.ps1 reset                  # down + DELETE volumes (asks first)
+  scripts\dev.ps1 seed                   # create mock MSP/customers/users (writes dev-users.json)
+  scripts\dev.ps1 totp msp.admin@acme.example   # current MFA code for a seeded user
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Position = 0)][ValidateSet('up', 'down', 'reset', 'logs', 'status', 'build')]
+    [Parameter(Position = 0)][ValidateSet('up', 'down', 'reset', 'logs', 'status', 'build', 'seed', 'totp', 'migrate')]
     [string]$Command = 'status',
     [Parameter(Position = 1)][string]$Service,
     [string[]]$Profiles = @('core'),
@@ -57,6 +59,25 @@ switch ($Command) {
         $logArgs = @('logs', '-f', '--tail', '200')
         if ($Service) { $logArgs += $Service }
         & docker @compose @allProfiles @logArgs
+    }
+    'migrate' { Invoke-Checked docker @compose @profileArgs run --rm -T migrate }
+    'seed' {
+        $out = Join-Path $root 'infrastructure\secrets\dev-users.json'
+        $ErrorActionPreference = 'Continue'
+        $json = & docker @compose @profileArgs run --rm -T migrate python -m app.db.seed 2>$null
+        if ($LASTEXITCODE -ne 0) { throw 'seed failed; run scripts\dev.ps1 up first' }
+        $text = ($json -join "`n")
+        if ($text -match '"already_seeded"') { Write-Host 'Already seeded. Credentials are in' $out; return }
+        [System.IO.File]::WriteAllText($out, $text)
+        Write-Step "seeded; credentials written to $out (git-ignored, mock data only)"
+        $users = ($text | ConvertFrom-Json).users
+        $users | Select-Object email, tenant, @{n = 'roles'; e = { $_.roles -join ',' } }, @{n = 'mfa'; e = { [bool]$_.totp_secret } } | Format-Table -AutoSize
+        Write-Host 'MFA codes: scripts\dev.ps1 totp <email>  (or add the totp_secret to an authenticator app)'
+    }
+    'totp' {
+        if (-not $Service) { throw 'usage: scripts\dev.ps1 totp <email>' }
+        Push-Location (Join-Path $root 'backend')
+        try { Invoke-Uv run python -m app.tools.totp $Service } finally { Pop-Location }
     }
     'status' {
         & docker @compose @allProfiles ps

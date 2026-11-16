@@ -155,14 +155,14 @@ sequenceDiagram
 |-------|-----------|
 | Auth token | `tid` (active tenant) claim; switching tenant issues a new token after a membership check. |
 | API | `TenantContext` dependency; every repository method requires it. |
-| PostgreSQL | `tenant_id` on every tenant-owned table; **RLS with `FORCE ROW LEVEL SECURITY`**; the app connects as a non-owner role; `SET LOCAL app.tenant_id` per transaction; the policy is `tenant_id = current_setting('app.tenant_id')::uuid`. |
+| PostgreSQL | `tenant_id` on every tenant-owned table; **RLS with `FORCE ROW LEVEL SECURITY`**; the app connects as a non-owner role; `SET LOCAL app.tenant_id` per transaction; the policy is `tenant_id = app_tenant()`. Role model: **ADR-0018**. |
 | ClickHouse | `tenant_id` first in the `ORDER BY` key; row policies per DB user plus a mandatory query builder that injects the tenant filter. |
 | OpenSearch | Index-per-tenant (`t-{tenant_short}-events-*`); the query façade only resolves aliases for the context tenant. |
 | Kafka | `tenant_id` in the message key and header; consumers verify it against the connector-instance ownership. |
 | Object/AI | The evidence assembler only queries through tenant-scoped repositories. |
 
 ### 6.2 AuthN/AuthZ
-- **Browser:** session in an HttpOnly, Secure, SameSite=Strict cookie held by the Next.js BFF. The BFF exchanges it for a short-lived (5 min) JWT to call the API, which keeps tokens out of browser JS.
+- **Browser:** opaque API session token in an HttpOnly, SameSite=Strict cookie held by the Next.js BFF and forwarded server-side; revocation is immediate. Mutations are Server Actions (Origin/Host check). See **ADR-0017** (this replaced the planned BFF-to-API JWT).
 - **Machine:** API keys (hashed, prefixed `nsk_`) or OAuth2 client credentials (later).
 - **Authorization:** permissions `resource:action[:scope]`; roles bundle permissions; bindings are `(user, tenant, role)`. ABAC conditions (portal, risk tier, asset criticality) live in the policy engine. In-process Python policy engine with an OPA-compatible interface so it can be swapped later.
 - **Step-up MFA** for approvals, secret changes, role changes and the kill switch.

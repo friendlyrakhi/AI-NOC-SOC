@@ -18,5 +18,7 @@
 | [0014](0014-temporal-for-workflows.md) | Temporal for workflows | accepted |
 | [0015](0015-phase-order-ai-before-automation.md) | Phase order: AI before automation | accepted |
 | [0016](0016-msp-tenancy-delegated-access-and-aggregate-views.md) | MSP tenancy, delegated access and aggregate views | accepted |
+| [0017](0017-bff-sessions-server-actions.md) | BFF with opaque server-side sessions and Server Actions | accepted |
+| [0018](0018-database-roles-and-rls-model.md) | Database roles, RLS enforcement and audit append path | accepted |
 
 New ADRs: copy [0000-template.md](0000-template.md).

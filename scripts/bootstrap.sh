@@ -15,7 +15,7 @@ done
 
 umask 077
 mkdir -p infrastructure/secrets infrastructure/certs
-for name in postgres_password database_password valkey_password; do
+for name in postgres_password database_password auth_database_password valkey_password master_key; do
   f="infrastructure/secrets/$name"
   if [[ -f "$f" && $rotate -eq 0 ]]; then
     echo "==> secret $name exists (kept)"

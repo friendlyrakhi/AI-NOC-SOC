@@ -5,7 +5,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 GITLEAKS_IMAGE='zricethezav/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f' # v8.30.1
-ALL=(ruff mypy imports bandit pytest pip-audit eslint typecheck vitest npm-audit build compose gitleaks)
+ALL=(ruff mypy imports bandit pytest openapi pip-audit eslint typecheck vitest npm-audit build compose gitleaks)
 gates=("$@"); [[ ${#gates[@]} -gt 0 ]] || gates=("${ALL[@]}")
 failed=()
 
@@ -16,6 +16,7 @@ run_gate() {
     imports)   uv run lint-imports ;;
     bandit)    uv run bandit -q -c pyproject.toml -r backend/app connectors ai-engine automation ;;
     pytest)    uv run pytest -q ;;
+    openapi)   (cd backend && uv run python -m app.tools.export_openapi --check) ;;
     pip-audit)
       req="$(mktemp)"
       uv export --frozen --no-dev --no-emit-workspace --no-hashes -o "$req" -q &&

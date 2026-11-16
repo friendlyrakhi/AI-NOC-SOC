@@ -44,6 +44,5 @@ def assert_execution_allowed(
         or certification is not Certification.LIVE_VERIFIED
     ):
         raise ExecutionDisabledError(
-            "live execution is disabled "
-            f"(platform={platform_mode}, connector={connector_mode}, cert={certification})"
+            f"live execution is disabled (platform={platform_mode}, connector={connector_mode}, cert={certification})"
         )

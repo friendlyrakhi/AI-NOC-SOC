@@ -8,6 +8,7 @@ Secrets are never given defaults.
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from urllib.parse import quote
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,19 +30,62 @@ class Settings(BaseSettings):
     # Phases 0-7, so the process refuses to start if anyone tries to set it.
     execution_mode: Literal["dry_run", "simulate"] = "simulate"
 
+    # --- PostgreSQL ---
     database_host: str = "postgres"
     database_port: int = 5432
     database_name: str = "nocsoc"
+    # RLS-enforced application role (all tenant data access).
     database_user: str = "nocsoc_app"
     database_password: SecretStr | None = None
+    # Identity role (BYPASSRLS, identity tables only). Used only by app.core.identity/authz.
+    auth_database_user: str = "nocsoc_auth"
+    auth_database_password: SecretStr | None = None
+    # Superuser: migrations and dev seeding only, never by the running API.
+    postgres_user: str = "postgres"
+    postgres_password: SecretStr | None = None
 
+    # --- Valkey ---
     valkey_host: str = "valkey"
     valkey_port: int = 6379
     valkey_password: SecretStr | None = None
 
+    # --- Secrets (envelope encryption master key, 32 bytes hex) ---
+    master_key: SecretStr | None = None
+
+    # --- Sessions & auth ---
+    session_ttl_hours: int = Field(default=12, ge=1, le=72)
+    session_idle_minutes: int = Field(default=60, ge=5, le=720)
+    step_up_minutes: int = Field(default=5, ge=1, le=30)
+    challenge_minutes: int = Field(default=5, ge=1, le=15)
+    invitation_hours: int = Field(default=72, ge=1, le=336)
+    login_max_failures: int = Field(default=10, ge=3)
+    login_window_seconds: int = Field(default=900, ge=60)
+
+    # --- Mail (Mailpit in dev) ---
+    smtp_host: str = "mailpit"
+    smtp_port: int = 1025
+    mail_from: str = "noc-soc-platform@localhost"
+    web_base_url: str = "http://127.0.0.1:3000"
+
     readiness_timeout_seconds: float = Field(default=2.0, gt=0, le=10)
 
     otel_enabled: bool = False
+
+    def _url(self, user: str, password: SecretStr | None) -> str:
+        pw = quote(password.get_secret_value(), safe="") if password else ""
+        return (
+            f"postgresql+psycopg://{quote(user, safe='')}:{pw}"
+            f"@{self.database_host}:{self.database_port}/{self.database_name}"
+        )
+
+    def app_database_url(self) -> str:
+        return self._url(self.database_user, self.database_password)
+
+    def auth_database_url(self) -> str:
+        return self._url(self.auth_database_user, self.auth_database_password)
+
+    def superuser_database_url(self) -> str:
+        return self._url(self.postgres_user, self.postgres_password)
 
 
 @lru_cache
