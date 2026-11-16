@@ -1,0 +1,107 @@
+[
+  {
+    "normalized": [
+      {
+        "asset_refs": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-win-06"
+          },
+          {
+            "kind": "fqdn",
+            "value": "t87d9-win-06.corp.example"
+          }
+        ],
+        "category": "Persistence",
+        "dedup_key": "mde:da000000000005982757",
+        "description": "",
+        "domain": "soc",
+        "kind": "alert",
+        "labels": {},
+        "mitre_techniques": [
+          "T1053"
+        ],
+        "observables": [
+          {
+            "type": "user",
+            "value": "a.smith"
+          }
+        ],
+        "observed_at": "2026-11-16T11:05:00Z",
+        "service_hint": null,
+        "severity": "low",
+        "source_alert_id": "da000000000005982757",
+        "status": "new",
+        "title": "Anomalous scheduled task created"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:05:00Z",
+      "payload": {
+        "alertCreationTime": "2026-11-16T11:05:00Z",
+        "category": "Persistence",
+        "computerDnsName": "t87d9-win-06.corp.example",
+        "evidence": [],
+        "id": "da000000000005982757",
+        "machineId": "547a84751d61b2b89ad1799903aaa75fe37ee3a9",
+        "mitreTechniques": [
+          "T1053"
+        ],
+        "relatedUser": {
+          "domainName": "CORP",
+          "userName": "a.smith"
+        },
+        "severity": "Low",
+        "status": "New",
+        "title": "Anomalous scheduled task created"
+      },
+      "schema": "microsoft.mde.alert@1",
+      "source_id": "da000000000005982757"
+    },
+    "stream": "alerts"
+  },
+  {
+    "normalized": [
+      {
+        "attributes": {
+          "os": "Windows11",
+          "risk": "None"
+        },
+        "environment": "unknown",
+        "identifiers": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-win-06"
+          },
+          {
+            "kind": "fqdn",
+            "value": "t87d9-win-06.corp.example"
+          },
+          {
+            "kind": "agent_id",
+            "value": "mde:547a84751d61b2b89ad1799903aaa75fe37ee3a9"
+          }
+        ],
+        "kind": "asset",
+        "name": "t87d9-win-06",
+        "observed_at": "2026-11-16T11:05:00Z",
+        "type": "host"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:05:00Z",
+      "payload": {
+        "computerDnsName": "t87d9-win-06.corp.example",
+        "healthStatus": "Active",
+        "id": "547a84751d61b2b89ad1799903aaa75fe37ee3a9",
+        "lastIpAddress": "10.39.38.74",
+        "lastSeen": "2026-11-16T11:05:00Z",
+        "osPlatform": "Windows11",
+        "riskScore": "None"
+      },
+      "schema": "microsoft.mde.machine@1",
+      "source_id": "547a84751d61b2b89ad1799903aaa75fe37ee3a9"
+    },
+    "stream": "machines"
+  }
+]

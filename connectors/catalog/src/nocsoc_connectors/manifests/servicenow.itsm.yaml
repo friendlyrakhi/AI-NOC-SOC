@@ -1,0 +1,30 @@
+id: servicenow.itsm
+name: ServiceNow ITSM
+vendor: ServiceNow
+category: itsm
+version: 0.1.0
+sdk: ">=1.0,<2.0"
+certification: sandbox
+docs_reference: "ServiceNow Table API: incident and cmdb_ci_server; business-rule outbound REST"
+auth_types: [basic, oauth2]
+streams:
+  - {name: incidents, output: ticket@1, default_interval_seconds: 120}
+  - {name: cmdb_servers, output: asset@1, default_interval_seconds: 3600}
+webhook: true
+actions:
+  - {key: itsm.create_incident, tier: T1}
+  - {key: itsm.update_incident, tier: T1}
+  - {key: itsm.create_change, tier: T1}
+severity_map: {}
+rate_limit_per_minute: 120
+config_schema:
+  type: object
+  properties:
+    instance_url: {type: string, description: "https://<instance>.service-now.com (live mode only)"}
+    assignment_group: {type: string}
+  additionalProperties: false
+secrets_schema:
+  type: object
+  properties:
+    username: {type: string}
+    password: {type: string}

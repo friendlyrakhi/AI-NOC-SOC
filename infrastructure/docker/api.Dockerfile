@@ -17,6 +17,7 @@ WORKDIR /src
 COPY pyproject.toml uv.lock ./
 COPY backend/pyproject.toml backend/
 COPY connectors/sdk/pyproject.toml connectors/sdk/
+COPY connectors/catalog/pyproject.toml connectors/catalog/
 COPY connectors/runner/pyproject.toml connectors/runner/
 COPY ai-engine/gateway/pyproject.toml ai-engine/gateway/
 COPY automation/worker/pyproject.toml automation/worker/
@@ -36,7 +37,13 @@ COPY --from=build --chown=root:root /src/.venv /src/.venv
 COPY --chown=root:root backend/app /src/backend/app
 COPY --chown=root:root backend/migrations /src/backend/migrations
 COPY --chown=root:root backend/alembic.ini /src/backend/alembic.ini
-ENV PATH="/src/.venv/bin:$PATH" PYTHONPATH=/src/backend PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+# Workspace libraries used by ingestion (normalizers) and sandbox scenarios. The image also
+# serves as the ingest worker and stream-migration one-shots (different command).
+COPY --chown=root:root connectors/sdk/src /src/connectors/sdk/src
+COPY --chown=root:root connectors/catalog/src /src/connectors/catalog/src
+ENV PATH="/src/.venv/bin:$PATH" \
+    PYTHONPATH=/src/backend:/src/connectors/sdk/src:/src/connectors/catalog/src \
+    PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /src/backend
 USER 10001
 EXPOSE 8000

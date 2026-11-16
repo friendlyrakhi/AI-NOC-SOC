@@ -171,7 +171,9 @@ The API computes `app.tenant_ids` **per request from the database** (active, une
 
 ## 3. ClickHouse (telemetry & analytics)
 
-Database `telemetry`. All tables are `MergeTree`-family with `tenant_id` first in the sort key, TTLs, and row policies.
+> **P2 as built:** database `nocsoc` with `raw_events` (7 d), `security_events` (30 d), `metrics` (14 d) and the canonical `events` table (30 d, see §6). Users: `nocsoc_admin` (setup only), `nocsoc_ingest` (INSERT), `nocsoc_reader` (SELECT, row policy `tenant_id = toUUID(getSetting('SQL_tenant_id'))` on every table, so a query without the tenant setting fails). Rollups, facts and `connector_metrics` arrive with P6/P7.
+
+Database `telemetry` (design). All tables are `MergeTree`-family with `tenant_id` first in the sort key, TTLs, and row policies.
 
 | Table | Engine / ORDER BY | TTL (dev) | Purpose |
 |-------|-------------------|-----------|---------|
@@ -197,6 +199,8 @@ Postgres is authoritative for alert and incident **state**. ClickHouse holds **f
 Before P6: global search uses Postgres `tsvector` on alerts/incidents/assets.
 
 ## 5. Event bus topics (Kafka API)
+
+> **P2 as built:** one `raw.<connector_id>` topic per connector with dots replaced by underscores (e.g. `raw.microsoft_sentinel`), 3 partitions, 24 h; `alerts.upserted` (72 h); `dlq.raw` (7 d). Poison messages are recorded in the Postgres `ingest_dead_letters` table (readable per tenant, bodies never returned by the API). The `tenantid` in an envelope is a claim: the worker checks it against the instance owner (T10).
 
 | Topic | Key | Producer → Consumer | Retention (dev) |
 |-------|-----|---------------------|-----------------|
@@ -224,6 +228,24 @@ Envelope (CloudEvents 1.0 shape, JSON in dev; Avro/Protobuf optional later):
 **Ops event / metric**: OTel log data model + resource semantic conventions (`host.name`, `cloud.provider`, `cloud.resource_id`, `service.name`, `k8s.*`).
 
 Severity mapping is documented per connector in its manifest and covered by golden tests.
+
+### 6.1 Canonical event model: EventV1 (P2)
+
+One shape for everything that *happened*, in both portals, whatever the source (`backend/app/events.py`):
+
+| Field | Meaning |
+|-------|---------|
+| `event_id` | envelope id + record index (unique, stable) |
+| `domain` | `noc` or `soc` |
+| `class` | `alert` (AlertV1), `detection` (OCSF 2004), `authentication` (3002), `process` (1007), `network` (4001), `api_activity` (6003), `ticket` (TicketV1) |
+| `severity` | critical, high, medium, low, info (mapped per connector manifest) |
+| `observed_at` | when it happened at the source |
+| `connector`, `instance_id`, `source_id` | provenance |
+| `title`, `asset`, `actor_user`, `src_ip`, `dst_ip`, `outcome`, `mitre[]` | common facets for search and correlation |
+| `attributes` | class-specific detail (JSON) |
+| `sandbox` | always `true` in this build |
+
+Metrics are not events (they stay in `metrics`); assets and vulnerability findings are state (Postgres). Alerts are both: their *state* (status, occurrences) lives in Postgres and every occurrence is an `alert` event in ClickHouse.
 
 ## 7. Data retention & lifecycle (defaults, per-tenant configurable)
 

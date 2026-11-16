@@ -1,0 +1,92 @@
+[
+  {
+    "normalized": [
+      {
+        "asset_refs": [
+          {
+            "kind": "cloud_id",
+            "value": "gce:7000000001"
+          }
+        ],
+        "category": "cloud",
+        "dedup_key": "gcp:Cloud SQL CPU > 85%:t87d9-gce-01",
+        "description": "",
+        "domain": "noc",
+        "kind": "alert",
+        "labels": {},
+        "mitre_techniques": [],
+        "observables": [],
+        "observed_at": "2026-11-16T11:05:00Z",
+        "service_hint": null,
+        "severity": "medium",
+        "source_alert_id": "0.0005982757",
+        "status": "new",
+        "title": "Cloud SQL CPU > 85% for t87d9-gce-01"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:05:00Z",
+      "payload": {
+        "condition_name": "Cloud SQL CPU > 85%",
+        "incident_id": "0.0005982757",
+        "policy_name": "Cloud SQL CPU > 85%",
+        "resource": {
+          "labels": {
+            "instance_id": "7000000001"
+          },
+          "type": "gce_instance"
+        },
+        "resource_name": "t87d9-gce-01",
+        "severity": "WARNING",
+        "started_at": 1794827100,
+        "state": "open",
+        "summary": "Cloud SQL CPU > 85% for t87d9-gce-01"
+      },
+      "schema": "gcp.monitoring.incident@1.2",
+      "source_id": "0.0005982757"
+    },
+    "stream": "incidents"
+  },
+  {
+    "normalized": [
+      {
+        "attributes": {
+          "provider": "gcp",
+          "zone": "europe-west4-a"
+        },
+        "environment": "prod",
+        "identifiers": [
+          {
+            "kind": "cloud_id",
+            "value": "gce:7000000003"
+          },
+          {
+            "kind": "hostname",
+            "value": "t87d9-gce-03"
+          }
+        ],
+        "kind": "asset",
+        "name": "t87d9-gce-03",
+        "observed_at": "2026-11-16T11:10:00Z",
+        "type": "vm"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:10:00Z",
+      "payload": {
+        "id": "7000000003",
+        "labels": {
+          "env": "prod"
+        },
+        "machineType": "e2-standard-4",
+        "name": "t87d9-gce-03",
+        "observedAt": "2026-11-16T11:10:00Z",
+        "status": "RUNNING",
+        "zone": "europe-west4-a"
+      },
+      "schema": "gcp.compute.instance@1",
+      "source_id": "7000000003"
+    },
+    "stream": "instances"
+  }
+]

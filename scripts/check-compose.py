@@ -5,7 +5,8 @@ Usage: python scripts/check-compose.py [--env-file PATH]
 Renders infrastructure/compose/docker-compose.yml with every profile enabled.
 
 Fails when any service publishes a port on a non-loopback address, runs privileged,
-mounts the Docker socket, adds capabilities, or passes secrets as environment values.
+mounts the Docker socket, adds capabilities, or passes secrets as environment values, or
+when the connector runner can reach a data store (network or credentials).
 """
 
 import argparse
@@ -44,6 +45,36 @@ def check(config: dict) -> list[str]:
             problems.append(f"{name}: missing security_opt no-new-privileges:true")
         if not svc.get("mem_limit") and not svc.get("deploy", {}).get("resources", {}).get("limits", {}).get("memory"):
             problems.append(f"{name}: no memory limit")
+    problems += check_isolation(config)
+    return problems
+
+
+# Services that run connector code must not share a network with the data stores (T13).
+CONNECTOR_RUNTIMES = {"connector-runner"}
+DATA_STORES = {"postgres", "valkey", "clickhouse"}
+
+
+def _networks(svc: dict) -> set[str]:
+    nets = svc.get("networks") or {"default": None}
+    return set(nets)
+
+
+def check_isolation(config: dict) -> list[str]:
+    services = config.get("services", {})
+    problems = []
+    for runtime in CONNECTOR_RUNTIMES & set(services):
+        rt = services[runtime]
+        for store in DATA_STORES & set(services):
+            shared = _networks(rt) & _networks(services[store])
+            if shared:
+                problems.append(f"{runtime}: shares network {sorted(shared)} with data store {store}")
+        for key in rt.get("environment") or {}:
+            if "DATABASE" in key or "CLICKHOUSE" in key or "VALKEY" in key:
+                problems.append(f"{runtime}: has data-store setting {key}")
+        for secret in rt.get("secrets") or []:
+            source = str(secret.get("source", ""))
+            if any(s in source for s in ("database", "clickhouse", "valkey", "postgres", "master_key")):
+                problems.append(f"{runtime}: has data-store secret {secret.get('source')}")
     return problems
 
 

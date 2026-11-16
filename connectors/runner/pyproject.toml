@@ -3,7 +3,7 @@ name = "nocsoc-connector-runner"
 version = "0.1.0"
 description = "Connector runtime service (P2)"
 requires-python = ">=3.12,<3.13"
-dependencies = ["nocsoc-connector-sdk"]
+dependencies = ["nocsoc-connector-sdk", "nocsoc-connectors", "aiokafka>=0.12", "httpx>=0.27", "pydantic-settings>=2.6"]
 
 [build-system]
 requires = ["hatchling>=1.25"]

@@ -1,0 +1,98 @@
+[
+  {
+    "normalized": [
+      {
+        "asset_refs": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-lnx-06"
+          },
+          {
+            "kind": "ip",
+            "value": "10.37.61.181"
+          }
+        ],
+        "cvss": 4.3,
+        "epss": 0.04,
+        "external_id": "tenable:7c103a59c20eceb3ef7b372c2ab34ad6",
+        "kev": false,
+        "kind": "vuln_finding",
+        "observed_at": "2026-11-16T11:05:00Z",
+        "severity": "medium",
+        "status": "open",
+        "title": "TLS 1.0 enabled",
+        "vuln_id": "CVE-DEMO-2026-1004"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:05:00Z",
+      "payload": {
+        "asset": {
+          "hostname": "t87d9-lnx-06",
+          "ipv4": "10.37.61.181",
+          "uuid": "127918747919e9a78eb65a0381c6fbcd"
+        },
+        "finding_id": "7c103a59c20eceb3ef7b372c2ab34ad6",
+        "first_found": "2026-11-06T11:05:00Z",
+        "last_found": "2026-11-16T11:05:00Z",
+        "plugin": {
+          "cve": [
+            "CVE-DEMO-2026-1004"
+          ],
+          "cvss3_base_score": 4.3,
+          "epss_score": 0.04,
+          "id": 150003,
+          "name": "TLS 1.0 enabled"
+        },
+        "severity": "medium",
+        "state": "OPEN"
+      },
+      "schema": "tenable.vuln_export@1",
+      "source_id": "7c103a59c20eceb3ef7b372c2ab34ad6"
+    },
+    "stream": "findings"
+  },
+  {
+    "normalized": [
+      {
+        "attributes": {
+          "os": "Linux"
+        },
+        "environment": "unknown",
+        "identifiers": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-lnx-04"
+          },
+          {
+            "kind": "ip",
+            "value": "10.18.85.65"
+          }
+        ],
+        "kind": "asset",
+        "name": "t87d9-lnx-04",
+        "observed_at": "2026-11-16T11:10:00Z",
+        "type": "host"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:10:00Z",
+      "payload": {
+        "hostnames": [
+          "t87d9-lnx-04"
+        ],
+        "id": "e0c6869cacae36e6c64a33da21d87e04",
+        "ipv4s": [
+          "10.18.85.65"
+        ],
+        "operating_systems": [
+          "Linux"
+        ],
+        "updated_at": "2026-11-16T11:10:00Z"
+      },
+      "schema": "tenable.asset_export@1",
+      "source_id": "e0c6869cacae36e6c64a33da21d87e04"
+    },
+    "stream": "assets"
+  }
+]

@@ -1,0 +1,76 @@
+[
+  {
+    "normalized": [
+      {
+        "asset_refs": [
+          {
+            "kind": "upn",
+            "value": "a.smith@corp.example"
+          }
+        ],
+        "category": "Persistence",
+        "dedup_key": "sentinel:incident:05982757-0000-4000-8000-000005982757",
+        "description": "Privileged role assigned outside change window for a.smith",
+        "domain": "soc",
+        "kind": "alert",
+        "labels": {
+          "incident_number": "5982757"
+        },
+        "mitre_techniques": [
+          "T1098"
+        ],
+        "observables": [
+          {
+            "type": "user",
+            "value": "a.smith"
+          }
+        ],
+        "observed_at": "2026-11-16T11:05:00Z",
+        "service_hint": null,
+        "severity": "high",
+        "source_alert_id": "05982757-0000-4000-8000-000005982757",
+        "status": "new",
+        "title": "Privileged role assigned outside change window"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:05:00Z",
+      "payload": {
+        "id": "/subscriptions/x/providers/Microsoft.SecurityInsights/incidents/05982757-0000-4000-8000-000005982757",
+        "name": "05982757-0000-4000-8000-000005982757",
+        "properties": {
+          "additionalData": {
+            "alertProductNames": [
+              "Azure Active Directory Identity Protection"
+            ],
+            "alertsCount": 1,
+            "tactics": [
+              "Persistence"
+            ],
+            "techniques": [
+              "T1098"
+            ]
+          },
+          "createdTimeUtc": "2026-11-16T11:05:00Z",
+          "description": "Privileged role assigned outside change window for a.smith",
+          "incidentNumber": 5982757,
+          "relatedEntities": [
+            {
+              "kind": "Account",
+              "properties": {
+                "accountName": "a.smith",
+                "upnSuffix": "corp.example"
+              }
+            }
+          ],
+          "severity": "High",
+          "status": "New",
+          "title": "Privileged role assigned outside change window"
+        }
+      },
+      "schema": "microsoft.sentinel.incident@2023-11",
+      "source_id": "05982757-0000-4000-8000-000005982757"
+    },
+    "stream": "incidents"
+  }
+]

@@ -1,0 +1,54 @@
+[
+  {
+    "normalized": [
+      {
+        "asset_refs": [],
+        "category": "infrastructure",
+        "dedup_key": "grafana:678a679d1f80f6f4",
+        "description": "PodRestartLoop for identity-sso",
+        "domain": "noc",
+        "kind": "alert",
+        "labels": {
+          "grafana_folder": "Production SLOs",
+          "job": "node",
+          "severity": "warning"
+        },
+        "mitre_techniques": [],
+        "observables": [],
+        "observed_at": "2026-11-16T11:05:00Z",
+        "service_hint": "identity-sso",
+        "severity": "medium",
+        "source_alert_id": "678a679d1f80f6f4",
+        "status": "new",
+        "title": "PodRestartLoop: PodRestartLoop for identity-sso"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:05:00Z",
+      "payload": {
+        "annotations": {
+          "description": "PodRestartLoop for identity-sso",
+          "summary": "PodRestartLoop for identity-sso"
+        },
+        "endsAt": "0001-01-01T00:00:00Z",
+        "fingerprint": "678a679d1f80f6f4",
+        "labels": {
+          "alertname": "PodRestartLoop",
+          "grafana_folder": "Production SLOs",
+          "instance": "identity-sso",
+          "job": "node",
+          "severity": "warning"
+        },
+        "startsAt": "2026-11-16T11:05:00Z",
+        "status": {
+          "inhibitedBy": [],
+          "silencedBy": [],
+          "state": "active"
+        }
+      },
+      "schema": "grafana.alert_instance@1",
+      "source_id": "678a679d1f80f6f4"
+    },
+    "stream": "alert_instances"
+  }
+]

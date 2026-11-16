@@ -1,0 +1,27 @@
+id: generic.webhook
+name: Generic webhook
+vendor: Any
+category: generic
+version: 0.1.0
+sdk: ">=1.0,<2.0"
+certification: sandbox
+docs_reference: "Platform-signed webhook (X-NocSoc-Signature) with configurable field mapping"
+auth_types: [hmac]
+streams: []
+webhook: true
+actions: []
+severity_map: {critical: critical, high: high, medium: medium, warning: medium, low: low, info: info}
+rate_limit_per_minute: 600
+config_schema:
+  type: object
+  properties:
+    domain: {type: string, enum: [noc, soc], default: noc}
+    id_path: {type: string, default: id}
+    title_path: {type: string, default: title}
+    severity_path: {type: string, default: severity}
+    host_path: {type: string, default: host}
+    time_path: {type: string, default: time}
+  additionalProperties: false
+secrets_schema:
+  type: object
+  properties: {}

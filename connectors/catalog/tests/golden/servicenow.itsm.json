@@ -1,0 +1,71 @@
+[
+  {
+    "normalized": [
+      {
+        "external_id": "049d185e2382ec4fcf1b585c97cca771",
+        "kind": "ticket",
+        "number": "INC0013379",
+        "observed_at": "2026-11-16T11:10:00Z",
+        "short_description": "Printer offline on floor 3",
+        "state": "resolved"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:10:00Z",
+      "payload": {
+        "cmdb_ci": {
+          "display_value": "t87d9-lnx-06"
+        },
+        "number": "INC0013379",
+        "priority": "3",
+        "short_description": "Printer offline on floor 3",
+        "state": "6",
+        "sys_id": "049d185e2382ec4fcf1b585c97cca771",
+        "sys_updated_on": "2026-11-16 11:10:00"
+      },
+      "schema": "servicenow.incident@1",
+      "source_id": "049d185e2382ec4fcf1b585c97cca771"
+    },
+    "stream": "incidents"
+  },
+  {
+    "normalized": [
+      {
+        "attributes": {
+          "cmdb_class": "cmdb_ci_server",
+          "os": "Windows 2022 Standard"
+        },
+        "environment": "prod",
+        "identifiers": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-win-08"
+          },
+          {
+            "kind": "ip",
+            "value": "10.57.2.11"
+          }
+        ],
+        "kind": "asset",
+        "name": "t87d9-win-08",
+        "observed_at": "2026-11-16T11:10:00Z",
+        "type": "host"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:10:00Z",
+      "payload": {
+        "environment": "Production",
+        "ip_address": "10.57.2.11",
+        "name": "t87d9-win-08",
+        "os": "Windows 2022 Standard",
+        "sys_class_name": "cmdb_ci_server",
+        "sys_id": "c74da4cc4717efa2c80b84aab50742db",
+        "sys_updated_on": "2026-11-16 11:10:00"
+      },
+      "schema": "servicenow.cmdb_ci_server@1",
+      "source_id": "c74da4cc4717efa2c80b84aab50742db"
+    },
+    "stream": "cmdb_servers"
+  }
+]

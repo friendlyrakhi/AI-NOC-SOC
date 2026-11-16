@@ -1,17 +1,20 @@
 import { BarList, SegmentBar, TimeSeriesChart } from "@/components/charts";
 import { DataTable } from "@/components/data-table";
-import { DemoBadge, DemoNotice, KpiTile } from "@/components/indicators";
+import { DemoBadge, DemoNotice, KpiTile, SandboxBadge, SandboxNotice } from "@/components/indicators";
 import { gate, Grid } from "@/components/page-states";
 import { Card, PageHeader } from "@/components/ui";
 import { weekDelta } from "@/lib/format";
 import { vulnColumns, vulnRow } from "@/lib/rows";
+import { pipelineVulnColumns, pipelineVulnRow } from "@/lib/pipeline-rows";
 import { getDemo } from "@/lib/server/demo";
+import { getVulns } from "@/lib/server/pipeline";
 import { countBy, severityParts } from "@/lib/severity";
 
 export default async function VulnerabilitiesPage() {
   const { me, data, aggregate } = await getDemo();
   const denied = gate(me, "vuln:read", "Vulnerability management");
   if (denied) return denied;
+  const ingested = aggregate ? null : await getVulns();
   const all = data.vulns;
   const open = all.filter((v) => v.status === "open" || v.status === "in_progress");
   const now = Date.parse(data.generatedAt);
@@ -41,8 +44,28 @@ export default async function VulnerabilitiesPage() {
           <BarList label="Open findings by asset" items={countBy(open, (v) => v.assetName, 6)} />
         </Card>
       </div>
+      {ingested && ingested.total > 0 && (
+        <section className="mt-6">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+            Findings ingested from sandbox scanners <SandboxBadge />
+          </h2>
+          <SandboxNotice>
+            Open findings from this tenant&apos;s sandbox Qualys and Tenable connectors, known-exploited first. Identifiers are sandbox
+            values, not real CVEs.
+          </SandboxNotice>
+          <DataTable
+            caption="Vulnerability findings ingested from sandbox connectors"
+            rows={ingested.items.map(pipelineVulnRow)}
+            columns={pipelineVulnColumns}
+            searchPlaceholder="Search ID, title, asset…"
+            exportName="vulnerabilities-sandbox"
+          />
+        </section>
+      )}
       <section className="mt-6">
-        <h2 className="mb-3 text-sm font-semibold">Findings (highest risk first)</h2>
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          Findings (highest risk first) <DemoBadge />
+        </h2>
         <DataTable
           caption="Vulnerability findings"
           rows={all.map(vulnRow)}

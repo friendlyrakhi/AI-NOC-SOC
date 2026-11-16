@@ -83,6 +83,13 @@ describe("CSV export", () => {
     expect(csv.split("\n")[1]).toBe(`"'=HYPERLINK(""http://x"")"`);
     expect(csv.split("\n")[2]).toBe(`"say ""hi"", ok"`);
   });
+
+  it("neutralises every formula trigger, including tab and carriage return", () => {
+    for (const lead of ["=", "+", "-", "@", "\t", "\r"]) {
+      const csv = toCsv([{ key: "a", header: "A" }], [{ _id: "1", a: `${lead}cmd|' /C calc'!A0` }]);
+      expect(csv.slice(csv.indexOf("\n") + 1).replace(/^"/, "")).toMatch(/^'/);
+    }
+  });
 });
 
 describe("health sorting", () => {

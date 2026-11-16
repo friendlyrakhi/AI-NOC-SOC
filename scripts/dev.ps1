@@ -2,8 +2,9 @@
 .SYNOPSIS
   Runs the local stack.
 .EXAMPLE
-  scripts\dev.ps1 up                     # core profile
-  scripts\dev.ps1 up -Profiles core,stream -Build
+  scripts\dev.ps1 up                     # core + stream profiles (P2 default)
+  scripts\dev.ps1 up -Profiles core      # without ingestion (lighter: no Redpanda/ClickHouse)
+  scripts\dev.ps1 up -Build
   scripts\dev.ps1 status                 # containers + memory use
   scripts\dev.ps1 logs api
   scripts\dev.ps1 down
@@ -16,7 +17,7 @@ param(
     [Parameter(Position = 0)][ValidateSet('up', 'down', 'reset', 'logs', 'status', 'build', 'seed', 'totp', 'migrate')]
     [string]$Command = 'status',
     [Parameter(Position = 1)][string]$Service,
-    [string[]]$Profiles = @('core'),
+    [string[]]$Profiles = @('core', 'stream'),
     [switch]$Build,
     [switch]$Force
 )

@@ -32,6 +32,7 @@ class Env:
     tenants: dict[str, str]  # slug -> id
     superuser_dsn: str
     app_dsn: str
+    worker_dsn: str
 
     def su(self) -> psycopg.Connection:
         return psycopg.connect(self.superuser_dsn, autocommit=True)
@@ -55,6 +56,8 @@ def env() -> Iterator[Env]:
             "database_port": int(pg.get_exposed_port(5432)),
             "database_password": SecretStr(secrets.token_hex(16)),
             "auth_database_password": SecretStr(secrets.token_hex(16)),
+            "worker_database_password": SecretStr(secrets.token_hex(16)),
+            "runner_token": SecretStr(secrets.token_hex(32)),
             "postgres_password": SecretStr(pg_password),
             "valkey_host": vk.get_container_host_ip(),
             "valkey_port": int(vk.get_exposed_port(6379)),
@@ -84,6 +87,7 @@ def env() -> Iterator[Env]:
             tenants=tenants,
             superuser_dsn=su_dsn,
             app_dsn=dsn("nocsoc_app", base["database_password"]),
+            worker_dsn=dsn("nocsoc_worker", base["worker_database_password"]),
         )
 
 
@@ -153,8 +157,8 @@ class Api:
     def get(self, email: str, path: str, **kw: Any) -> Any:
         return self.client.get(f"/api/v1{path}", headers=self.headers(email), **kw)
 
-    def post(self, email: str, path: str, json: Any = None) -> Any:
-        return self.client.post(f"/api/v1{path}", headers=self.headers(email), json=json)
+    def post(self, email: str, path: str, json: Any = None, params: dict[str, Any] | None = None) -> Any:
+        return self.client.post(f"/api/v1{path}", headers=self.headers(email), json=json, params=params)
 
     def put(self, email: str, path: str, json: Any = None) -> Any:
         return self.client.put(f"/api/v1{path}", headers=self.headers(email), json=json)

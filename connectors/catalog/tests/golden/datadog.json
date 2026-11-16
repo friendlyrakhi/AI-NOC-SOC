@@ -1,0 +1,128 @@
+[
+  {
+    "normalized": [
+      {
+        "asset_refs": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-lnx-02"
+          }
+        ],
+        "category": "application",
+        "dedup_key": "datadog:monitor:2102:t87d9-lnx-02",
+        "description": "%%% \n[P3] Error rate above 1% on customer-portal\n %%%",
+        "domain": "noc",
+        "kind": "alert",
+        "labels": {
+          "env": "prod",
+          "service": "customer-portal"
+        },
+        "mitre_techniques": [],
+        "observables": [],
+        "observed_at": "2026-11-16T11:03:00Z",
+        "service_hint": "customer-portal",
+        "severity": "medium",
+        "source_alert_id": "9971261",
+        "status": "new",
+        "title": "[P3] Error rate above 1% on customer-portal"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:03:00Z",
+      "payload": {
+        "alert_type": "warning",
+        "date_happened": 1794826980,
+        "host": "t87d9-lnx-02",
+        "id": 9971261,
+        "monitor_id": 2102,
+        "priority": "normal",
+        "source_type_name": "Monitor Alert",
+        "tags": [
+          "service:customer-portal",
+          "env:prod"
+        ],
+        "text": "%%% \n[P3] Error rate above 1% on customer-portal\n %%%",
+        "title": "[P3] Error rate above 1% on customer-portal"
+      },
+      "schema": "datadog.event@1",
+      "source_id": "9971261"
+    },
+    "stream": "events"
+  },
+  {
+    "normalized": [
+      {
+        "attributes": {
+          "datadog_apps": [
+            "agent",
+            "nginx"
+          ]
+        },
+        "environment": "unknown",
+        "identifiers": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-lnx-02"
+          }
+        ],
+        "kind": "asset",
+        "name": "t87d9-lnx-02",
+        "observed_at": "2026-11-16T11:05:00Z",
+        "type": "host"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:05:00Z",
+      "payload": {
+        "apps": [
+          "agent",
+          "nginx"
+        ],
+        "host_name": "t87d9-lnx-02",
+        "id": 5001,
+        "last_reported_time": 1794827100,
+        "meta": {
+          "platform": "linux"
+        },
+        "name": "t87d9-lnx-02",
+        "sources": [
+          "agent"
+        ],
+        "up": true
+      },
+      "schema": "datadog.host@1",
+      "source_id": "5001"
+    },
+    "stream": "hosts"
+  },
+  {
+    "normalized": [
+      {
+        "asset_ref": {
+          "kind": "hostname",
+          "value": "t87d9-lnx-08"
+        },
+        "kind": "metric",
+        "name": "system.cpu.user",
+        "observed_at": "2026-11-16T11:02:00Z",
+        "unit": "percent",
+        "value": 34.25
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:02:00Z",
+      "payload": {
+        "host": "t87d9-lnx-08",
+        "id": "m-14956891",
+        "metric": "system.cpu.user",
+        "scope": "host:t87d9-lnx-08",
+        "ts": 1794826920,
+        "unit": "percent",
+        "value": 34.25
+      },
+      "schema": "datadog.metric_point@1",
+      "source_id": "m-14956891"
+    },
+    "stream": "metrics"
+  }
+]

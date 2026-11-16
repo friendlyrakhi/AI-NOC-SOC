@@ -88,12 +88,14 @@ Deliverables:
 - Integrations UI (catalog, instance config from JSON Schema, write-only secrets, health, scenario replay); NOC/SOC alert queues reading real (mock-sourced) data.
 - Webhook ingress with HMAC.
 
-**Exit criteria:**
-- [ ] All 16 connectors pass ContractSuite; every one shows "SANDBOX" in the UI.
-- [ ] Replaying all scenarios yields expected alerts (golden), with dedup working.
-- [ ] Fault injection drives correct health transitions.
-- [ ] Burst test: 10× scenario replay without loss; lag recovers.
-- [ ] SEC-CON-01..05, SEC-SEC-01/02, SEC-ISO-03/05 pass.
+**Exit criteria:** (status: [reports/P2-exit-review.md](reports/P2-exit-review.md))
+- [x] All 16 connectors pass ContractSuite; every one shows "SANDBOX" in the UI.
+- [x] Replaying all scenarios yields expected alerts (golden), with dedup working.
+- [x] Fault injection drives correct health transitions.
+- [x] Burst test: 10× scenario replay without loss; lag recovers.
+- [x] SEC-CON-01..05, SEC-SEC-01/02, SEC-ISO-03/05 pass (SEC-CON-04 per-tenant ingest quotas are partial; see the report).
+
+**Added at your request (2026-11-16):** canonical NOC/SOC event model (EventV1) with `/events` search, structured JSON logging with request IDs and a secret scrubber, tenant-scoped Valkey caching and per-tenant budgets for heavy endpoints, operator dependency status, and DEMO sandbox integrations in the seed.
 
 **Dependencies:** OCSF/OTel schema subset agreed (included in docs); ClickHouse/Redpanda images.
 

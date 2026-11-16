@@ -1,0 +1,87 @@
+[
+  {
+    "normalized": [
+      {
+        "asset_refs": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-lnx-07"
+          }
+        ],
+        "category": "infrastructure",
+        "dedup_key": "prometheus:ce41c11b3daa0692",
+        "description": "Scrape target t87d9-lnx-07 is down",
+        "domain": "noc",
+        "kind": "alert",
+        "labels": {
+          "job": "node",
+          "severity": "critical"
+        },
+        "mitre_techniques": [],
+        "observables": [],
+        "observed_at": "2026-11-16T11:03:00Z",
+        "service_hint": null,
+        "severity": "critical",
+        "source_alert_id": "ce41c11b3daa0692",
+        "status": "new",
+        "title": "TargetDown: Scrape target t87d9-lnx-07 is down"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:03:00Z",
+      "payload": {
+        "annotations": {
+          "description": "Scrape target t87d9-lnx-07 is down",
+          "summary": "Scrape target t87d9-lnx-07 is down"
+        },
+        "endsAt": "0001-01-01T00:00:00Z",
+        "fingerprint": "ce41c11b3daa0692",
+        "labels": {
+          "alertname": "TargetDown",
+          "instance": "t87d9-lnx-07:9100",
+          "job": "node",
+          "severity": "critical"
+        },
+        "startsAt": "2026-11-16T11:03:00Z",
+        "status": {
+          "inhibitedBy": [],
+          "silencedBy": [],
+          "state": "active"
+        }
+      },
+      "schema": "alertmanager.alert@2",
+      "source_id": "ce41c11b3daa0692"
+    },
+    "stream": "alerts"
+  },
+  {
+    "normalized": [
+      {
+        "asset_ref": {
+          "kind": "hostname",
+          "value": "t87d9-lnx-06"
+        },
+        "kind": "metric",
+        "name": "node_load1",
+        "observed_at": "2026-11-16T11:02:00Z",
+        "unit": "",
+        "value": 5.82
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:02:00Z",
+      "payload": {
+        "id": "p-14956891",
+        "metric": {
+          "__name__": "node_load1",
+          "instance": "t87d9-lnx-06:9100"
+        },
+        "ts": 1794826920,
+        "value": 5.82
+      },
+      "schema": "prometheus.sample@1",
+      "source_id": "p-14956891"
+    },
+    "stream": "metrics"
+  }
+]

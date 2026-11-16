@@ -1,6 +1,8 @@
 """Process-wide services, created in the app lifespan and stored on ``app.state.services``."""
 
-from dataclasses import dataclass
+import asyncio
+from dataclasses import dataclass, field
+from typing import Any
 
 import redis.asyncio as redis
 from fastapi import Request
@@ -11,6 +13,7 @@ from app.core.secrets import LocalEnvelopeProvider, SecretsProvider
 from app.db.engines import AppDatabase
 from app.mail import Mailer, SmtpMailer
 from app.ratelimit import RateLimiter
+from app.streaming import Publisher
 
 
 @dataclass
@@ -22,8 +25,36 @@ class Services:
     limiter: RateLimiter
     secrets: SecretsProvider
     mailer: Mailer
+    _publisher: Publisher | None = field(default=None, repr=False)
+    _publisher_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+    _reader: Any = field(default=None, repr=False)
+
+    async def analytics_reader(self) -> Any:
+        """ClickHouse client as ``nocsoc_reader`` (row policies). None when not configured."""
+        if not self.settings.clickhouse_host or self.settings.clickhouse_reader_password is None:
+            return None
+        if self._reader is None:
+            from app.analytics import reader_client
+
+            self._reader = await reader_client(self.settings)
+        return self._reader
+
+    async def publisher(self) -> Publisher | None:
+        """Kafka producer, started on first use. None when streaming is not configured."""
+        if not self.settings.kafka_bootstrap:
+            return None
+        async with self._publisher_lock:
+            if self._publisher is None:
+                pub = Publisher(self.settings.kafka_bootstrap)
+                await pub.start()
+                self._publisher = pub
+        return self._publisher
 
     async def close(self) -> None:
+        if self._publisher is not None:
+            await self._publisher.stop()
+        if self._reader is not None:
+            await self._reader.close()
         await self.app_db.dispose()
         await self.auth_db.dispose()
         await self.valkey.aclose()

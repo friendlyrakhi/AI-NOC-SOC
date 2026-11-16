@@ -20,10 +20,22 @@ TENANT_SCOPED = {
     "api_keys",
     "audit_log",
     "users",
+    # P2 integrations and ingestion
+    "secrets",
+    "connector_instances",
+    "connector_checkpoints",
+    "connector_runs",
+    "assets",
+    "asset_identifiers",
+    "alerts",
+    "vuln_findings",
+    "ingest_seen",
+    "ingest_dead_letters",
 }
 IDENTITY_ONLY = {"user_credentials", "sessions", "auth_challenges", "invitations"}  # no app policies
 GLOBAL = {"permissions", "alembic_version"}
-AGGREGATE_READABLE = {"tenants", "audit_log"}
+WORKER_ONLY = {"ingest_seen"}  # the app role has no grant at all
+AGGREGATE_READABLE = {"tenants", "audit_log", "alerts", "assets", "vuln_findings"}
 
 
 def app_conn(env: Env, tenant: str | None = None, user: str | None = None) -> psycopg.Connection:
@@ -56,7 +68,7 @@ def test_every_table_is_classified_and_protected(env: Env) -> None:
     assert aggregate_policies == AGGREGATE_READABLE
 
 
-@pytest.mark.parametrize("table", sorted(TENANT_SCOPED - {"role_permissions", "roles"}))
+@pytest.mark.parametrize("table", sorted(TENANT_SCOPED - {"role_permissions", "roles"} - WORKER_ONLY))
 def test_no_context_sees_nothing(env: Env, table: str) -> None:
     with app_conn(env) as c:
         assert c.execute(f"SELECT count(*) FROM {table}").fetchone() == (0,)  # noqa: S608
@@ -165,3 +177,72 @@ def test_audit_access_check_never_returns_null(env: Env) -> None:
             for mirror in (True, False):
                 row = c.execute("SELECT audit_caller_may_access(%s, %s)", (tenant, mirror)).fetchone()
                 assert row == (False,)
+
+
+# ---------------------------------------------------------------- P2: ingest worker role
+
+
+def worker_conn(env: Env, tenant: str | None = None) -> psycopg.Connection:
+    conn = psycopg.connect(env.worker_dsn)
+    if tenant:
+        conn.execute("SELECT set_config('app.tenant_id', %s, false)", (env.tenants[tenant],))
+    return conn
+
+
+@pytest.mark.parametrize(
+    "table", ["alerts", "assets", "asset_identifiers", "vuln_findings", "ingest_seen", "connector_instances"]
+)
+def test_worker_without_context_sees_nothing(env: Env, table: str) -> None:
+    with worker_conn(env) as c:
+        assert c.execute(f"SELECT count(*) FROM {table}").fetchone() == (0,)  # noqa: S608
+
+
+def test_worker_cannot_write_other_tenant_alert(env: Env) -> None:
+    with worker_conn(env, "globex") as c, pytest.raises(errors.InsufficientPrivilege):
+        c.execute(
+            "INSERT INTO alerts (tenant_id, domain, connector_id, source_alert_id, fingerprint, title, severity, "
+            "first_seen, last_seen) VALUES (%s, 'noc', 'x', 'x', 'x', 'x', 'low', now(), now())",
+            (env.tenants["initech"],),
+        )
+
+
+@pytest.mark.parametrize(
+    "table", ["secrets", "connector_runs", "connector_checkpoints", "users", "audit_log", "sessions"]
+)
+def test_worker_has_no_access_outside_ingestion(env: Env, table: str) -> None:
+    with worker_conn(env, "globex") as c, pytest.raises(errors.InsufficientPrivilege):
+        c.execute(f"SELECT 1 FROM {table} LIMIT 1")  # noqa: S608
+
+
+def test_connector_mode_is_sandbox_only(env: Env) -> None:
+    """Guardrail #1 holds at the schema level, whatever the API does."""
+    with app_conn(env, "globex") as c, pytest.raises(errors.CheckViolation):
+        c.execute(
+            "INSERT INTO connector_instances (tenant_id, definition_id, name, mode) "
+            "VALUES (app_tenant(), 'splunk', 'live?', 'live')"
+        )
+
+
+def test_app_cannot_read_ingest_ledger_or_write_alert_content(env: Env) -> None:
+    with app_conn(env, "globex") as c:
+        with pytest.raises(errors.InsufficientPrivilege):
+            c.execute("SELECT 1 FROM ingest_seen")
+        c.rollback()
+        c.execute("SELECT set_config('app.tenant_id', %s, false)", (env.tenants["globex"],))
+        with pytest.raises(errors.InsufficientPrivilege):
+            c.execute("UPDATE alerts SET title = 'forged'")
+
+
+def test_worker_prunes_only_expired_ledger_entries(env: Env) -> None:
+    tenant = env.tenants["globex"]
+    with env.su() as c:
+        c.execute(
+            "INSERT INTO ingest_seen (tenant_id, record_key, seen_at) VALUES "
+            "(%s, 'prune-old', now() - interval '8 days'), (%s, 'prune-new', now())",
+            (tenant, tenant),
+        )
+    with worker_conn(env) as c:  # no tenant context: the SECURITY DEFINER function spans tenants
+        assert c.execute("SELECT ingest_seen_cleanup(7)").fetchone()[0] >= 1  # type: ignore[index]
+    with env.su() as c:
+        keys = {r[0] for r in c.execute("SELECT record_key FROM ingest_seen WHERE record_key LIKE 'prune-%'")}
+    assert keys == {"prune-new"}

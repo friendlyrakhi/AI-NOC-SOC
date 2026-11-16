@@ -1,0 +1,95 @@
+[
+  {
+    "normalized": [
+      {
+        "asset_refs": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-win-01"
+          }
+        ],
+        "category": "endpoint",
+        "dedup_key": "splunk:Suspicious Command-Line Arguments:admin.ops:t87d9-win-01",
+        "description": "Suspicious Command-Line Arguments",
+        "domain": "soc",
+        "kind": "alert",
+        "labels": {},
+        "mitre_techniques": [
+          "T1059"
+        ],
+        "observables": [
+          {
+            "type": "user",
+            "value": "admin.ops"
+          },
+          {
+            "type": "ip",
+            "value": "192.0.2.89"
+          }
+        ],
+        "observed_at": "2026-11-16T11:05:00Z",
+        "service_hint": null,
+        "severity": "high",
+        "source_alert_id": "notable-5982757",
+        "status": "new",
+        "title": "Suspicious Command-Line Arguments"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:05:00Z",
+      "payload": {
+        "_time": 1794827100,
+        "annotations.mitre_attack": [
+          "T1059"
+        ],
+        "dest": "t87d9-win-01",
+        "event_id": "notable-5982757",
+        "rule_description": "Suspicious Command-Line Arguments",
+        "rule_name": "Suspicious Command-Line Arguments",
+        "security_domain": "endpoint",
+        "src": "192.0.2.89",
+        "status_label": "New",
+        "urgency": "high",
+        "user": "admin.ops"
+      },
+      "schema": "splunk.es.notable@1",
+      "source_id": "notable-5982757"
+    },
+    "stream": "notables"
+  },
+  {
+    "normalized": [
+      {
+        "activity": "Logon (rdp)",
+        "actor_user": "a.smith",
+        "class_uid": 3002,
+        "device_hostname": "t87d9-lnx-03",
+        "dst_ip": null,
+        "kind": "security_event",
+        "message": "failure logon for a.smith",
+        "mitre_techniques": [
+          "T1110"
+        ],
+        "observed_at": "2026-11-16T11:01:00Z",
+        "outcome": "failure",
+        "severity": "low",
+        "src_ip": "10.39.38.74"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:01:00Z",
+      "payload": {
+        "_time": 1794826860,
+        "action": "failure",
+        "app": "rdp",
+        "dest": "t87d9-lnx-03",
+        "event_id": "auth-29913781",
+        "src": "10.39.38.74",
+        "user": "a.smith"
+      },
+      "schema": "splunk.cim.authentication@1",
+      "source_id": "auth-29913781"
+    },
+    "stream": "auth_events"
+  }
+]

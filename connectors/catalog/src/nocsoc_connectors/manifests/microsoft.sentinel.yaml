@@ -1,0 +1,28 @@
+id: microsoft.sentinel
+name: Microsoft Sentinel
+vendor: Microsoft
+category: siem
+version: 0.1.0
+sdk: ">=1.0,<2.0"
+certification: sandbox
+docs_reference: "Microsoft.SecurityInsights REST API: incidents list"
+auth_types: [service_principal]
+streams:
+  - {name: incidents, domain: soc, output: alert@1, default_interval_seconds: 60}
+webhook: false
+actions:
+  - {key: sentinel.update_incident, tier: T1, reversible: true}
+severity_map: {High: high, Medium: medium, Low: low, Informational: info}
+rate_limit_per_minute: 120
+config_schema:
+  type: object
+  properties:
+    subscription_id: {type: string}
+    resource_group: {type: string}
+    workspace_name: {type: string}
+  additionalProperties: false
+secrets_schema:
+  type: object
+  properties:
+    client_id: {type: string}
+    client_secret: {type: string}

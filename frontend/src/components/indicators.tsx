@@ -77,6 +77,33 @@ export function DemoNotice({ children }: { children?: ReactNode }) {
   );
 }
 
+/**
+ * Marks data that came through the real ingestion pipeline from a *sandbox* connector:
+ * real platform processing of simulated vendor data. Distinct from DEMO (generated in the UI).
+ */
+export function SandboxBadge() {
+  return (
+    <span
+      title="Ingested through the platform pipeline from a sandbox connector (simulated vendor data). Not a live system."
+      className="border-primary/60 text-primary rounded border px-1.5 py-px text-[10px] font-bold tracking-wider"
+    >
+      SANDBOX
+    </span>
+  );
+}
+
+export function SandboxNotice({ children }: { children?: ReactNode }) {
+  return (
+    <div role="note" className="border-primary/40 bg-primary/5 mb-4 flex items-start gap-3 rounded-md border px-3 py-2 text-xs">
+      <SandboxBadge />
+      <p className="text-muted">
+        {children ??
+          "Ingested by the platform from sandbox connectors: real normalization, de-duplication and storage of simulated vendor data. No live systems are connected."}
+      </p>
+    </div>
+  );
+}
+
 export function KpiTile({
   label,
   value,

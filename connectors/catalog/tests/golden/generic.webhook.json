@@ -1,0 +1,42 @@
+[
+  {
+    "normalized": [
+      {
+        "asset_refs": [
+          {
+            "kind": "hostname",
+            "value": "web-01"
+          }
+        ],
+        "category": "webhook",
+        "dedup_key": "generic:abc-1",
+        "description": "",
+        "domain": "noc",
+        "kind": "alert",
+        "labels": {},
+        "mitre_techniques": [],
+        "observables": [],
+        "observed_at": "2026-11-16T12:00:00Z",
+        "service_hint": null,
+        "severity": "critical",
+        "source_alert_id": "abc-1",
+        "status": "new",
+        "title": "Disk full"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T12:00:00Z",
+      "payload": {
+        "domain": "noc",
+        "host": "web-01",
+        "id": "abc-1",
+        "severity": "critical",
+        "time": "2026-11-16T12:00:00Z",
+        "title": "Disk full"
+      },
+      "schema": "generic.canonical_alert@1",
+      "source_id": "abc-1"
+    },
+    "stream": "webhook"
+  }
+]

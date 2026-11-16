@@ -1,0 +1,29 @@
+id: solarwinds.orion
+name: SolarWinds Orion
+vendor: SolarWinds
+category: observability
+version: 0.1.0
+sdk: ">=1.0,<2.0"
+certification: sandbox
+docs_reference: "SolarWinds Information Service (SWIS) REST API: Orion.AlertActive and Orion.Nodes queries"
+auth_types: [basic]
+streams:
+  - {name: alerts, domain: noc, output: alert@1, default_interval_seconds: 60}
+  - {name: nodes, output: asset@1, default_interval_seconds: 900}
+webhook: false
+actions:
+  - {key: nms.ack_alert, tier: T1, reversible: false}
+  - {key: nms.unmanage_node, tier: T2, reversible: true}
+severity_map: {"0": info, "1": medium, "2": critical, "3": high, "4": low}
+rate_limit_per_minute: 60
+config_schema:
+  type: object
+  properties:
+    base_url: {type: string, description: "https://orion.example:17774 (live mode only)"}
+    verify_tls: {type: boolean, default: true}
+  additionalProperties: false
+secrets_schema:
+  type: object
+  properties:
+    username: {type: string}
+    password: {type: string}

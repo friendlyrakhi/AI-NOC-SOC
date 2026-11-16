@@ -59,7 +59,19 @@ def initech_ids(api: Api) -> dict[str, str]:
     key = api.post(INITECH_ADMIN, "/api-keys", {"name": "initech key", "permissions": ["user:read"]})
     assert key.status_code == 201, key.text
     delegation = api.get(INITECH_ADMIN, "/delegations").json()[0]
+    instance = api.post(INITECH_ADMIN, "/connectors/instances", {"definition_id": "prometheus", "name": "initech prom"})
+    assert instance.status_code == 201, instance.text
+    with api.env.su() as c:
+        alert_id = c.execute(
+            "INSERT INTO alerts (tenant_id, domain, connector_id, source_alert_id, fingerprint, title, severity, "
+            "first_seen, last_seen) VALUES (%s, 'noc', 'prometheus', 'i-1', 'initech-fp', 'Initech private alert', "
+            "'high', now(), now()) RETURNING id",
+            (api.env.tenants["initech"],),
+        ).fetchone()[0]
     return {
+        "instance_id": instance.json()["id"],
+        "alert_id": str(alert_id),
+        "key": "core_switch_failure",  # a scenario key: replaying it may only ever touch the caller's tenant
         "user_id": api.env.users["soc@initech.example"]["id"],
         "role_id": role.json()["id"],
         "key_id": key.json()["id"],
@@ -79,6 +91,13 @@ def _initech_snapshot(api: Api) -> tuple:  # type: ignore[type-arg]
                 "SELECT id, revoked_at FROM delegations WHERE customer_tenant_id = %s ORDER BY id", (t,)
             ).fetchall(),
             c.execute("SELECT count(*) FROM role_bindings WHERE tenant_id = %s", (t,)).fetchall(),
+            c.execute(
+                "SELECT id, name, config, enabled, secret_id, webhook_secret_id, sync_requested_at, status, version "
+                "FROM connector_instances WHERE tenant_id = %s ORDER BY id",
+                (t,),
+            ).fetchall(),
+            c.execute("SELECT id, status, version FROM alerts WHERE tenant_id = %s ORDER BY id", (t,)).fetchall(),
+            c.execute("SELECT count(*) FROM connector_runs WHERE tenant_id = %s", (t,)).fetchall(),
         )
 
 
@@ -94,9 +113,16 @@ def test_foreign_ids_never_succeed(api: Api, initech_ids: dict[str, str]) -> Non
     api.step_up(GLOBEX_ADMIN)
     before = _initech_snapshot(api)
     tried = []
-    for method, route_path, _op in _operations(api):
+    for method, route_path, op in _operations(api):
         if "{" not in route_path:
             continue
+        # Token/HMAC routes reject a user session outright; a scenario replay acts only on the
+        # caller's own tenant (its ID is a catalog key), and with no event bus here it is 503.
+        allowed = {403, 404, 409, 422}
+        if op.get("x-required-permission") in {"internal", "webhook_hmac"}:
+            allowed |= {401}
+        if route_path.endswith("/scenarios/{key}/replay"):
+            allowed |= {503}
         params = re.findall(r"{(\w+)}", route_path)
         if not all(p in initech_ids for p in params):
             pytest.fail(f"no foreign id for params {params} in {route_path}; extend initech_ids")
@@ -105,7 +131,7 @@ def test_foreign_ids_never_succeed(api: Api, initech_ids: dict[str, str]) -> Non
             path = path.replace("{" + p + "}", initech_ids[p])
         r = api.client.request(method, path, headers=api.headers(GLOBEX_ADMIN), json=_BODIES.get(method))
         tried.append((method, route_path, r.status_code))
-        assert r.status_code in (403, 404, 409, 422), (method, route_path, r.status_code, r.text)
+        assert r.status_code in allowed, (method, route_path, r.status_code, r.text)
     assert len(tried) >= 8
     assert _initech_snapshot(api) == before, "a cross-tenant call changed Initech data"
 

@@ -1,0 +1,26 @@
+id: tenable
+name: Tenable
+vendor: Tenable
+category: vuln
+version: 0.1.0
+sdk: ">=1.0,<2.0"
+certification: sandbox
+docs_reference: "Tenable Vulnerability Management: vulnerability export chunks and asset export"
+auth_types: [api_keys]
+streams:
+  - {name: findings, output: vuln_finding@1, default_interval_seconds: 3600}
+  - {name: assets, output: asset@1, default_interval_seconds: 3600}
+webhook: false
+actions: []
+severity_map: {critical: critical, high: high, medium: medium, low: low, info: info}
+rate_limit_per_minute: 30
+config_schema:
+  type: object
+  properties:
+    base_url: {type: string, default: "https://cloud.tenable.com"}
+  additionalProperties: false
+secrets_schema:
+  type: object
+  properties:
+    access_key: {type: string}
+    secret_key: {type: string}

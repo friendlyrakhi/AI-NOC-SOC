@@ -1,0 +1,26 @@
+id: grafana
+name: Grafana
+vendor: Grafana Labs
+category: observability
+version: 0.1.0
+sdk: ">=1.0,<2.0"
+certification: sandbox
+docs_reference: "Grafana Alerting: Alertmanager-compatible alert instances API and webhook contact point"
+auth_types: [service_account_token]
+streams:
+  - {name: alert_instances, domain: noc, output: alert@1, default_interval_seconds: 60}
+webhook: true
+actions:
+  - {key: grafana.silence, tier: T1, reversible: true}
+  - {key: grafana.annotate, tier: T1, reversible: false}
+severity_map: {critical: critical, high: high, warning: medium, info: info}
+rate_limit_per_minute: 300
+config_schema:
+  type: object
+  properties:
+    base_url: {type: string}
+  additionalProperties: false
+secrets_schema:
+  type: object
+  properties:
+    token: {type: string}

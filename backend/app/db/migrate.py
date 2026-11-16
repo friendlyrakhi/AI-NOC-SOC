@@ -52,6 +52,11 @@ def ensure_roles(settings: Settings) -> None:
             _secret(settings.database_password, "database_password"),
         ),
         (
+            settings.worker_database_user,
+            "LOGIN NOBYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE",
+            _secret(settings.worker_database_password, "worker_database_password"),
+        ),
+        (
             settings.auth_database_user,
             "LOGIN BYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE",
             _secret(settings.auth_database_password, "auth_database_password"),
@@ -72,9 +77,10 @@ def ensure_roles(settings: Settings) -> None:
         conn.execute(sql.SQL("REVOKE ALL ON DATABASE {} FROM PUBLIC").format(db))
         conn.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
         conn.execute(sql.SQL("GRANT CREATE, USAGE ON SCHEMA public TO {}").format(sql.Identifier(OWNER)))
-        for name in (settings.database_user, settings.auth_database_user):
+        logins = (settings.database_user, settings.auth_database_user, settings.worker_database_user)
+        for name in logins:
             conn.execute(sql.SQL("GRANT CONNECT, TEMPORARY ON DATABASE {} TO {}").format(db, sql.Identifier(name)))
-        for name in (settings.database_user, settings.auth_database_user, AGGREGATE):
+        for name in (*logins, AGGREGATE):
             conn.execute(sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(sql.Identifier(name)))
         # The app may *switch to* the read-only aggregate role, but does not inherit it.
         conn.execute(

@@ -1,0 +1,29 @@
+id: aws.cloudwatch
+name: AWS CloudWatch
+vendor: Amazon Web Services
+category: cloud_monitoring
+version: 0.1.0
+sdk: ">=1.0,<2.0"
+certification: sandbox
+docs_reference: "CloudWatch DescribeAlarmHistory, GetMetricData; EC2 DescribeInstances; SNS alarm notifications"
+auth_types: [iam_role, access_key]
+streams:
+  - {name: alarms, domain: noc, output: alert@1, default_interval_seconds: 60}
+  - {name: instances, output: asset@1, default_interval_seconds: 900}
+  - {name: metrics, output: metric@1, default_interval_seconds: 60}
+webhook: true
+actions:
+  - {key: aws.reboot_instance, tier: T2, reversible: false}
+severity_map: {ALARM: high, INSUFFICIENT_DATA: low, OK: info}
+rate_limit_per_minute: 120
+config_schema:
+  type: object
+  properties:
+    region: {type: string, default: eu-west-1, pattern: "^[a-z]{2}-[a-z]+-[0-9]$"}
+    role_arn: {type: string}
+  additionalProperties: false
+secrets_schema:
+  type: object
+  properties:
+    access_key_id: {type: string}
+    secret_access_key: {type: string}

@@ -1,0 +1,93 @@
+[
+  {
+    "normalized": [
+      {
+        "asset_refs": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-fw-01"
+          },
+          {
+            "kind": "ip",
+            "value": "10.55.58.254"
+          }
+        ],
+        "category": "network",
+        "dedup_key": "solarwinds:t87d9-fw-01:Interface utilization above 85%",
+        "description": "Interface utilization above 85% on t87d9-fw-01",
+        "domain": "noc",
+        "kind": "alert",
+        "labels": {
+          "entity_type": "Orion.NPM.Interfaces"
+        },
+        "mitre_techniques": [],
+        "observables": [],
+        "observed_at": "2026-11-16T11:04:00Z",
+        "service_hint": null,
+        "severity": "medium",
+        "source_alert_id": "7478446",
+        "status": "new",
+        "title": "Interface utilization above 85%"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:04:00Z",
+      "payload": {
+        "Acknowledged": false,
+        "AlertActiveID": 7478446,
+        "AlertObjectID": 79809,
+        "EntityCaption": "t87d9-fw-01",
+        "EntityType": "Orion.NPM.Interfaces",
+        "IPAddress": "10.55.58.254",
+        "Name": "Interface utilization above 85%",
+        "Severity": 1,
+        "TriggeredDateTime": "2026-11-16T11:04:00Z",
+        "TriggeredMessage": "Interface utilization above 85% on t87d9-fw-01"
+      },
+      "schema": "solarwinds.alert_active@1",
+      "source_id": "7478446"
+    },
+    "stream": "alerts"
+  },
+  {
+    "normalized": [
+      {
+        "attributes": {
+          "model": "Linux",
+          "orion_node_id": 1007,
+          "vendor": "Net-SNMP"
+        },
+        "environment": "unknown",
+        "identifiers": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-lnx-02"
+          },
+          {
+            "kind": "ip",
+            "value": "10.14.149.180"
+          }
+        ],
+        "kind": "asset",
+        "name": "t87d9-lnx-02",
+        "observed_at": "2026-11-16T11:05:00Z",
+        "type": "host"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:05:00Z",
+      "payload": {
+        "Caption": "t87d9-lnx-02",
+        "IPAddress": "10.14.149.180",
+        "LastSystemUpTimePollUtc": "2026-11-16T11:05:00Z",
+        "MachineType": "Linux",
+        "NodeID": 1007,
+        "Status": 1,
+        "Vendor": "Net-SNMP"
+      },
+      "schema": "solarwinds.node@1",
+      "source_id": "1007"
+    },
+    "stream": "nodes"
+  }
+]

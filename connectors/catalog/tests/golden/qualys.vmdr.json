@@ -1,0 +1,93 @@
+[
+  {
+    "normalized": [
+      {
+        "asset_refs": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-lnx-02"
+          },
+          {
+            "kind": "ip",
+            "value": "10.14.149.180"
+          }
+        ],
+        "cvss": 7.8,
+        "epss": null,
+        "external_id": "qualys:501225518",
+        "kev": false,
+        "kind": "vuln_finding",
+        "observed_at": "2026-11-16T11:05:00Z",
+        "severity": "high",
+        "status": "fixed",
+        "title": "Privilege escalation in kernel netfilter",
+        "vuln_id": "CVE-DEMO-2026-1002"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:05:00Z",
+      "payload": {
+        "cve_ids": [
+          "CVE-DEMO-2026-1002"
+        ],
+        "cvss3_base": 7.8,
+        "first_found_datetime": "2026-11-09T11:05:00Z",
+        "host": {
+          "dns": "t87d9-lnx-02.corp.example",
+          "id": 6393660,
+          "ip": "10.14.149.180"
+        },
+        "last_found_datetime": "2026-11-16T11:05:00Z",
+        "qid": 38001,
+        "severity": 4,
+        "status": "Fixed",
+        "title": "Privilege escalation in kernel netfilter",
+        "unique_vuln_id": 501225518
+      },
+      "schema": "qualys.vm.detection@2",
+      "source_id": "501225518"
+    },
+    "stream": "detections"
+  },
+  {
+    "normalized": [
+      {
+        "attributes": {
+          "os": "Linux"
+        },
+        "environment": "unknown",
+        "identifiers": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-lnx-02"
+          },
+          {
+            "kind": "fqdn",
+            "value": "t87d9-lnx-02.corp.example"
+          },
+          {
+            "kind": "ip",
+            "value": "10.14.149.180"
+          }
+        ],
+        "kind": "asset",
+        "name": "t87d9-lnx-02",
+        "observed_at": "2026-11-16T11:10:00Z",
+        "type": "host"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:10:00Z",
+      "payload": {
+        "dns": "t87d9-lnx-02.corp.example",
+        "id": 6393660,
+        "ip": "10.14.149.180",
+        "last_scan_datetime": "2026-11-16T11:10:00Z",
+        "os": "Linux"
+      },
+      "schema": "qualys.asset.host@2",
+      "source_id": "6393660"
+    },
+    "stream": "hosts"
+  }
+]

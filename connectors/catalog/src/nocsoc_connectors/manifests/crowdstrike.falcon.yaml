@@ -1,0 +1,28 @@
+id: crowdstrike.falcon
+name: CrowdStrike Falcon
+vendor: CrowdStrike
+category: edr
+version: 0.1.0
+sdk: ">=1.0,<2.0"
+certification: sandbox
+docs_reference: "Falcon Alerts API (alerts/combined/alerts) and Hosts API (devices/combined/devices); OAuth2 client credentials"
+auth_types: [oauth2_client_credentials]
+streams:
+  - {name: alerts, domain: soc, output: alert@1, default_interval_seconds: 60}
+  - {name: hosts, output: asset@1, default_interval_seconds: 900}
+webhook: false
+actions:
+  - {key: edr.isolate_host, tier: T3, reversible: true}
+  - {key: edr.release_host, tier: T2, reversible: true}
+severity_map: {Critical: critical, High: high, Medium: medium, Low: low, Informational: info}
+rate_limit_per_minute: 100
+config_schema:
+  type: object
+  properties:
+    cloud: {type: string, enum: [us-1, us-2, eu-1, us-gov-1], default: eu-1}
+  additionalProperties: false
+secrets_schema:
+  type: object
+  properties:
+    client_id: {type: string}
+    client_secret: {type: string}

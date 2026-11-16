@@ -1,0 +1,28 @@
+id: azure.monitor
+name: Azure Monitor
+vendor: Microsoft
+category: cloud_monitoring
+version: 0.1.0
+sdk: ">=1.0,<2.0"
+certification: sandbox
+docs_reference: "Azure Alerts Management REST API (Microsoft.AlertsManagement/alerts); common alert schema for action groups"
+auth_types: [service_principal]
+streams:
+  - {name: alerts, domain: noc, output: alert@1, default_interval_seconds: 60}
+  - {name: resources, output: asset@1, default_interval_seconds: 900}
+webhook: true
+actions:
+  - {key: azure.restart_vm, tier: T2, reversible: false}
+severity_map: {Sev0: critical, Sev1: high, Sev2: medium, Sev3: low, Sev4: info}
+rate_limit_per_minute: 120
+config_schema:
+  type: object
+  properties:
+    subscription_id: {type: string}
+    tenant: {type: string}
+  additionalProperties: false
+secrets_schema:
+  type: object
+  properties:
+    client_id: {type: string}
+    client_secret: {type: string}

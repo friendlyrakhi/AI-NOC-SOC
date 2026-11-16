@@ -1,0 +1,27 @@
+id: prometheus
+name: Prometheus / Alertmanager
+vendor: CNCF
+category: observability
+version: 0.1.0
+sdk: ">=1.0,<2.0"
+certification: sandbox
+docs_reference: "Alertmanager API v2 /api/v2/alerts and webhook_config payload; Prometheus HTTP API query_range"
+auth_types: [none, bearer]
+streams:
+  - {name: alerts, domain: noc, output: alert@1, default_interval_seconds: 60}
+  - {name: metrics, output: metric@1, default_interval_seconds: 60}
+webhook: true
+actions:
+  - {key: am.create_silence, tier: T1, reversible: true}
+severity_map: {critical: critical, page: critical, error: high, warning: medium, info: info}
+rate_limit_per_minute: 600
+config_schema:
+  type: object
+  properties:
+    alertmanager_url: {type: string}
+    prometheus_url: {type: string}
+  additionalProperties: false
+secrets_schema:
+  type: object
+  properties:
+    bearer_token: {type: string}

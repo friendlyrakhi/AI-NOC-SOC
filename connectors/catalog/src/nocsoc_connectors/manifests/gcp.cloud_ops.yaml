@@ -1,0 +1,26 @@
+id: gcp.cloud_ops
+name: Google Cloud Operations
+vendor: Google Cloud
+category: cloud_monitoring
+version: 0.1.0
+sdk: ">=1.0,<2.0"
+certification: sandbox
+docs_reference: "Cloud Monitoring incidents (webhook notification channel schema 1.2) and Compute Engine instances"
+auth_types: [service_account]
+streams:
+  - {name: incidents, domain: noc, output: alert@1, default_interval_seconds: 60}
+  - {name: instances, output: asset@1, default_interval_seconds: 900}
+webhook: true
+actions:
+  - {key: gcp.restart_instance, tier: T2, reversible: false}
+severity_map: {CRITICAL: critical, ERROR: high, WARNING: medium, SEVERITY_UNSPECIFIED: medium}
+rate_limit_per_minute: 120
+config_schema:
+  type: object
+  properties:
+    project_id: {type: string}
+  additionalProperties: false
+secrets_schema:
+  type: object
+  properties:
+    service_account_json: {type: string}

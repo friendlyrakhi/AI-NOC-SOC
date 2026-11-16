@@ -22,11 +22,11 @@ class TenantContextError(RuntimeError):
 
 
 class AppDatabase:
-    """Connections as ``nocsoc_app`` (RLS enforced)."""
+    """Connections as ``nocsoc_app`` (RLS enforced), or ``nocsoc_worker`` for the ingest worker."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, *, url: str | None = None) -> None:
         self.engine: AsyncEngine = create_async_engine(
-            settings.app_database_url(), pool_size=5, max_overflow=5, pool_pre_ping=True
+            url or settings.app_database_url(), pool_size=5, max_overflow=5, pool_pre_ping=True
         )
 
     async def dispose(self) -> None:

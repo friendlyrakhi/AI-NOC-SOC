@@ -1,6 +1,8 @@
 # Unified AI NOC & SOC platform: local development stack.
-# Profiles (docs/02-architecture.md §7). Only `core` exists in P0. Later phases add
-# stream (P2), analytics (P2), ai (P4), workflow (P5), search (P6), observability (P7).
+# Profiles (docs/02-architecture.md §7): core (P0-P1), stream + analytics (P2). Later phases
+# add ai (P4), workflow (P5), search (P6), observability (P7).
+#   stream:    Redpanda, ClickHouse, stream setup, ingest worker, connector runner
+#   analytics: ClickHouse only (event search without ingestion)
 #
 # Rules (threat model T27/T30): every published port binds to 127.0.0.1, no privileged
 # containers, no Docker socket mounts, secrets come from files and never from env values.
@@ -19,6 +21,7 @@ services:
   postgres:
     <<: *hardening
     profiles: [core]
+    networks: [data]
     # pgvector 0.8.7 on PostgreSQL 17.12
     image: pgvector/pgvector@sha256:b513c48566e4777cd3370451400000c78eda6a08131d68f4c31d4a76f27bd8fd
     environment:
@@ -49,6 +52,7 @@ services:
   valkey:
     <<: *hardening
     profiles: [core]
+    networks: [data]
     # Valkey 8.1.11
     image: valkey/valkey@sha256:2602ace2be6569bc2bbb06f873776516ab9089821525be34f4305c67eb9db02a
     secrets: [valkey_password]
@@ -74,6 +78,7 @@ services:
   mailpit:
     <<: *hardening
     profiles: [core]
+    networks: [data]
     # Mailpit 1.33.1: dev email sink, nothing leaves the machine.
     image: axllent/mailpit@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
     ports:
@@ -87,6 +92,7 @@ services:
     <<: *hardening
     restart: "no"
     profiles: [core]
+    networks: [data]
     build:
       context: ../..
       dockerfile: infrastructure/docker/api.Dockerfile
@@ -103,6 +109,8 @@ services:
         target: nocsoc_database_password
       - source: auth_database_password
         target: nocsoc_auth_database_password
+      - source: worker_database_password
+        target: nocsoc_worker_database_password
       - source: master_key
         target: nocsoc_master_key
     read_only: true
@@ -115,6 +123,7 @@ services:
   api:
     <<: *hardening
     profiles: [core]
+    networks: [data, bus, frontend]
     build:
       context: ../..
       dockerfile: infrastructure/docker/api.Dockerfile
@@ -129,6 +138,9 @@ services:
       NOCSOC_VALKEY_HOST: valkey
       NOCSOC_SMTP_HOST: mailpit
       NOCSOC_WEB_BASE_URL: http://127.0.0.1:${NOCSOC_WEB_PORT:-3000}
+      # Optional (stream/analytics profiles). Without them those features answer 503.
+      NOCSOC_KAFKA_BOOTSTRAP: redpanda:9092
+      NOCSOC_CLICKHOUSE_HOST: clickhouse
     # File names carry the settings prefix: pydantic-settings maps NOCSOC_<FIELD> to them.
     secrets:
       - source: database_password
@@ -139,6 +151,10 @@ services:
         target: nocsoc_valkey_password
       - source: master_key
         target: nocsoc_master_key
+      - source: runner_token
+        target: nocsoc_runner_token
+      - source: clickhouse_reader_password
+        target: nocsoc_clickhouse_reader_password
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -158,6 +174,7 @@ services:
   web:
     <<: *hardening
     profiles: [core]
+    networks: [frontend]
     build:
       context: ../..
       dockerfile: infrastructure/docker/web.Dockerfile
@@ -184,6 +201,138 @@ services:
       start_period: 10s
     mem_limit: 512m
 
+  # ------------------------------------------------------------------ P2: stream + analytics
+  redpanda:
+    <<: *hardening
+    profiles: [stream]
+    networks: [bus]
+    # Redpanda v25.2.9 (Kafka API). Dev mode, single node, plaintext on the internal network;
+    # the host listener binds to 127.0.0.1 only. SASL/TLS arrive with the hardened profile (P7).
+    image: redpandadata/redpanda@sha256:bd6c35647153a4dbc19507c8037dcca0802484c23e6e5fbb97591a62539e313a
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --memory=512M
+      - --reserve-memory=0M
+      - --overprovisioned
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://127.0.0.1:${NOCSOC_KAFKA_PORT:-19092}
+    # Topics are created explicitly by migrate-stream; producers only write to known topics.
+    # (dev-container mode leaves auto-create on; disabling it is part of the P7 hardened profile.)
+    volumes:
+      - redpandadata:/var/lib/redpanda/data
+    ports:
+      - "127.0.0.1:${NOCSOC_KAFKA_PORT:-19092}:19092"
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -Eq 'Healthy:.+true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    mem_limit: 900m
+
+  clickhouse:
+    <<: *hardening
+    profiles: [stream, analytics]
+    networks: [data]
+    # ClickHouse 25.8 LTS. The bootstrap admin creates the ingest/reader users and row policies
+    # (app.db.migrate_stream); the API only ever connects as nocsoc_reader.
+    image: clickhouse/clickhouse-server@sha256:0152dd511befe6a2c2ef53e930726179669b08116da78500b37c51c96ff5ee77
+    environment:
+      CLICKHOUSE_USER: nocsoc_admin
+      CLICKHOUSE_PASSWORD_FILE: /run/secrets/clickhouse_admin_password
+      CLICKHOUSE_DB: nocsoc
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    secrets: [clickhouse_admin_password]
+    volumes:
+      - clickhousedata:/var/lib/clickhouse
+    ports:
+      - "127.0.0.1:${NOCSOC_CLICKHOUSE_PORT:-8123}:8123"
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user nocsoc_admin --password \"$$(cat /run/secrets/clickhouse_admin_password)\" -q 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    mem_limit: 1500m
+
+  # One-shot: topics, ClickHouse tables, users and row policies (app.db.migrate_stream).
+  migrate-stream:
+    <<: *hardening
+    restart: "no"
+    profiles: [stream]
+    networks: [data, bus]
+    image: nocsoc/api:dev
+    command: ["python", "-m", "app.db.migrate_stream"]
+    environment:
+      NOCSOC_KAFKA_BOOTSTRAP: redpanda:9092
+      NOCSOC_CLICKHOUSE_HOST: clickhouse
+    secrets:
+      - source: clickhouse_admin_password
+        target: nocsoc_clickhouse_admin_password
+      - source: clickhouse_ingest_password
+        target: nocsoc_clickhouse_ingest_password
+      - source: clickhouse_reader_password
+        target: nocsoc_clickhouse_reader_password
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    depends_on:
+      redpanda: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    mem_limit: 256m
+
+  ingest-worker:
+    <<: *hardening
+    profiles: [stream]
+    networks: [data, bus]
+    image: nocsoc/api:dev
+    command: ["python", "-m", "app.workers.ingest"]
+    environment:
+      NOCSOC_DATABASE_HOST: postgres
+      NOCSOC_KAFKA_BOOTSTRAP: redpanda:9092
+      NOCSOC_CLICKHOUSE_HOST: clickhouse
+    # Least privilege: the RLS-bound worker role and the INSERT-only ClickHouse user.
+    secrets:
+      - source: worker_database_password
+        target: nocsoc_worker_database_password
+      - source: clickhouse_ingest_password
+        target: nocsoc_clickhouse_ingest_password
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    depends_on:
+      migrate-stream: { condition: service_completed_successfully }
+    mem_limit: 384m
+
+  connector-runner:
+    <<: *hardening
+    profiles: [stream]
+    networks: [bus]
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/runner.Dockerfile
+      secrets: [build_extra_ca]
+    image: nocsoc/runner:dev
+    environment:
+      NOCSOC_API_URL: http://api:8000
+      NOCSOC_KAFKA_BOOTSTRAP: redpanda:9092
+    # Only the runner token: no database or ClickHouse credentials (sandbox connectors only).
+    secrets:
+      - source: runner_token
+        target: nocsoc_runner_token
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    depends_on:
+      api: { condition: service_healthy }
+      migrate-stream: { condition: service_completed_successfully }
+    mem_limit: 256m
+
 secrets:
   # Build-time only: extra root CA for TLS-inspecting antivirus/proxies (see infrastructure/certs).
   build_extra_ca:
@@ -198,6 +347,25 @@ secrets:
     file: ../secrets/master_key
   valkey_password:
     file: ../secrets/valkey_password
+  worker_database_password:
+    file: ../secrets/worker_database_password
+  runner_token:
+    file: ../secrets/runner_token
+  clickhouse_admin_password:
+    file: ../secrets/clickhouse_admin_password
+  clickhouse_ingest_password:
+    file: ../secrets/clickhouse_ingest_password
+  clickhouse_reader_password:
+    file: ../secrets/clickhouse_reader_password
+
+# Segmentation (threat model T13, SEC-CON-02): the connector runner reaches only the API and
+# the event bus. Data stores sit on `data`, which the runner is not attached to.
+networks:
+  data:
+  bus:
+  frontend:
 
 volumes:
   pgdata:
+  redpandadata:
+  clickhousedata:

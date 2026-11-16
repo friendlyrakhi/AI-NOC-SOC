@@ -1,0 +1,28 @@
+id: wazuh
+name: Wazuh
+vendor: Wazuh
+category: siem
+version: 0.1.0
+sdk: ">=1.0,<2.0"
+certification: sandbox
+docs_reference: "Wazuh server API: alerts (indexer) and /agents; integrations webhook"
+auth_types: [basic_jwt]
+streams:
+  - {name: alerts, domain: soc, output: alert@1, default_interval_seconds: 60}
+  - {name: agents, output: asset@1, default_interval_seconds: 900}
+webhook: true
+actions:
+  - {key: wazuh.active_response, tier: T3, reversible: false}
+severity_map: {}
+rate_limit_per_minute: 120
+config_schema:
+  type: object
+  properties:
+    base_url: {type: string}
+    min_rule_level: {type: integer, minimum: 0, maximum: 15, default: 3}
+  additionalProperties: false
+secrets_schema:
+  type: object
+  properties:
+    username: {type: string}
+    password: {type: string}

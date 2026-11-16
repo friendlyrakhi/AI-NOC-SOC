@@ -1,0 +1,98 @@
+[
+  {
+    "normalized": [
+      {
+        "asset_refs": [
+          {
+            "kind": "cloud_id",
+            "value": "/subscriptions/00000000-0000-4000-8000-000000000000/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/t87d9-azvm-01"
+          }
+        ],
+        "category": "cloud",
+        "dedup_key": "azure.monitor:VM heartbeat missing:/subscriptions/00000000-0000-4000-8000-000000000000/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/t87d9-azvm-01",
+        "description": "",
+        "domain": "noc",
+        "kind": "alert",
+        "labels": {
+          "signal_type": "Metric"
+        },
+        "mitre_techniques": [],
+        "observables": [],
+        "observed_at": "2026-11-16T11:04:00Z",
+        "service_hint": null,
+        "severity": "high",
+        "source_alert_id": "/subscriptions/00000000-0000-4000-8000-000000000000/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/t87d9-azvm-01/providers/Microsoft.AlertsManagement/alerts/00721cae",
+        "status": "new",
+        "title": "VM heartbeat missing on t87d9-azvm-01"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:04:00Z",
+      "payload": {
+        "id": "/subscriptions/00000000-0000-4000-8000-000000000000/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/t87d9-azvm-01/providers/Microsoft.AlertsManagement/alerts/00721cae",
+        "name": "VM heartbeat missing",
+        "properties": {
+          "essentials": {
+            "alertRule": "VM heartbeat missing",
+            "alertState": "New",
+            "monitorCondition": "Fired",
+            "severity": "Sev1",
+            "signalType": "Metric",
+            "startDateTime": "2026-11-16T11:04:00Z",
+            "targetResource": "/subscriptions/00000000-0000-4000-8000-000000000000/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/t87d9-azvm-01",
+            "targetResourceName": "t87d9-azvm-01"
+          }
+        }
+      },
+      "schema": "azure.alerts_management.alert@1",
+      "source_id": "/subscriptions/00000000-0000-4000-8000-000000000000/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/t87d9-azvm-01/providers/Microsoft.AlertsManagement/alerts/00721cae"
+    },
+    "stream": "alerts"
+  },
+  {
+    "normalized": [
+      {
+        "attributes": {
+          "location": "westeurope",
+          "provider": "azure"
+        },
+        "environment": "prod",
+        "identifiers": [
+          {
+            "kind": "cloud_id",
+            "value": "/subscriptions/00000000-0000-4000-8000-000000000000/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/t87d9-azvm-04"
+          },
+          {
+            "kind": "hostname",
+            "value": "t87d9-azvm-04"
+          }
+        ],
+        "kind": "asset",
+        "name": "t87d9-azvm-04",
+        "observed_at": "2026-11-16T11:10:00Z",
+        "type": "vm"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:10:00Z",
+      "payload": {
+        "id": "/subscriptions/00000000-0000-4000-8000-000000000000/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/t87d9-azvm-04",
+        "location": "westeurope",
+        "name": "t87d9-azvm-04",
+        "observedAt": "2026-11-16T11:10:00Z",
+        "properties": {
+          "hardwareProfile": {
+            "vmSize": "Standard_D4s_v5"
+          },
+          "provisioningState": "Succeeded"
+        },
+        "tags": {
+          "env": "prod"
+        }
+      },
+      "schema": "azure.compute.vm@1",
+      "source_id": "/subscriptions/00000000-0000-4000-8000-000000000000/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/t87d9-azvm-04"
+    },
+    "stream": "resources"
+  }
+]

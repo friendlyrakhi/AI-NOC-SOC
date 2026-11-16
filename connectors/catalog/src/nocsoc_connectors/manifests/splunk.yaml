@@ -1,0 +1,27 @@
+id: splunk
+name: Splunk
+vendor: Splunk
+category: siem
+version: 0.1.0
+sdk: ">=1.0,<2.0"
+certification: sandbox
+docs_reference: "Splunk ES notable events (search export) and authentication data model events; HEC-style webhook"
+auth_types: [token]
+streams:
+  - {name: notables, domain: soc, output: alert@1, default_interval_seconds: 60}
+  - {name: auth_events, output: security_event@1, default_interval_seconds: 60}
+webhook: true
+actions:
+  - {key: splunk.update_notable, tier: T1, reversible: true}
+severity_map: {critical: critical, high: high, medium: medium, low: low, informational: info}
+rate_limit_per_minute: 120
+config_schema:
+  type: object
+  properties:
+    base_url: {type: string}
+    app: {type: string, default: SplunkEnterpriseSecuritySuite}
+  additionalProperties: false
+secrets_schema:
+  type: object
+  properties:
+    token: {type: string}

@@ -1,0 +1,110 @@
+[
+  {
+    "normalized": [
+      {
+        "asset_refs": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-lnx-01"
+          }
+        ],
+        "category": "authentication_failed",
+        "dedup_key": "wazuh:510:t87d9-lnx-01",
+        "description": "",
+        "domain": "soc",
+        "kind": "alert",
+        "labels": {
+          "rule_id": "510",
+          "rule_level": "7"
+        },
+        "mitre_techniques": [],
+        "observables": [
+          {
+            "type": "ip",
+            "value": "198.51.100.83"
+          }
+        ],
+        "observed_at": "2026-11-16T11:02:00Z",
+        "service_hint": null,
+        "severity": "medium",
+        "source_alert_id": "1794826920.14956891",
+        "status": "new",
+        "title": "Host-based anomaly detection event (rootcheck)"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:02:00Z",
+      "payload": {
+        "agent": {
+          "id": "296",
+          "ip": "10.40.118.135",
+          "name": "t87d9-lnx-01"
+        },
+        "data": {
+          "srcip": "198.51.100.83"
+        },
+        "id": "1794826920.14956891",
+        "rule": {
+          "description": "Host-based anomaly detection event (rootcheck)",
+          "groups": [
+            "authentication_failed"
+          ],
+          "id": "510",
+          "level": 7,
+          "mitre": {
+            "id": []
+          }
+        },
+        "timestamp": "2026-11-16T11:02:00Z"
+      },
+      "schema": "wazuh.alert@4",
+      "source_id": "1794826920.14956891"
+    },
+    "stream": "alerts"
+  },
+  {
+    "normalized": [
+      {
+        "attributes": {
+          "agent_status": "active",
+          "os": "Ubuntu"
+        },
+        "environment": "unknown",
+        "identifiers": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-lnx-02"
+          },
+          {
+            "kind": "agent_id",
+            "value": "wazuh:660"
+          },
+          {
+            "kind": "ip",
+            "value": "10.14.149.180"
+          }
+        ],
+        "kind": "asset",
+        "name": "t87d9-lnx-02",
+        "observed_at": "2026-11-16T11:05:00Z",
+        "type": "host"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:05:00Z",
+      "payload": {
+        "id": "660",
+        "ip": "10.14.149.180",
+        "lastKeepAlive": "2026-11-16T11:05:00Z",
+        "name": "t87d9-lnx-02",
+        "os": {
+          "name": "Ubuntu"
+        },
+        "status": "active"
+      },
+      "schema": "wazuh.agent@4",
+      "source_id": "660"
+    },
+    "stream": "agents"
+  }
+]

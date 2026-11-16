@@ -60,7 +60,7 @@ test.describe("NOC portal", () => {
     const header = page.getByRole("columnheader", { name: /Raised/ }).first();
     await header.getByRole("button").click();
     await expect(header).toHaveAttribute("aria-sort", "ascending");
-    await page.getByRole("tab", { name: /Correlated groups/ }).click();
+    await page.getByRole("tab", { name: /correlated groups/i }).click();
     await expect(page.getByRole("tabpanel")).toContainText(/confidence/);
   });
 
@@ -124,7 +124,7 @@ test.describe("SOC portal", () => {
   test("threat data never looks like real-world identifiers", async ({ page }) => {
     await signIn(page, SOC_RESPONDER);
     await page.goto("/soc/vulnerabilities");
-    await expect(page.getByRole("table", { name: "Vulnerability findings" })).toContainText("CVE-DEMO-");
+    await expect(page.getByRole("table", { name: "Vulnerability findings", exact: true })).toContainText("CVE-DEMO-");
     await page.goto("/soc/threat-intel");
     await expect(page.getByText("Ember Lynx (demo)").first()).toBeVisible();
   });
@@ -139,14 +139,68 @@ test.describe("SOC portal", () => {
 });
 
 test.describe("Administration and shared areas", () => {
-  test("connectors show honest status, never a fake connection", async ({ page }) => {
+  test("connectors show runner-reported status; a new instance never claims health", async ({ page }) => {
     await signIn(page, TENANT_ADMIN);
     await page.goto("/connectors");
-    const table = page.getByRole("table", { name: "Connector catalog" });
-    await expect(table.getByRole("row")).toHaveCount(17); // header + 16 connectors
-    await expect(table).not.toContainText(/Connected|Healthy|Online/);
-    const statuses = await table.locator("tbody tr td:nth-child(5)").allTextContents();
-    expect(new Set(statuses)).toEqual(new Set(["Not configured"]));
+    const catalog = page.getByRole("table", { name: "Connector catalog" });
+    await expect(catalog.getByRole("row")).toHaveCount(17); // header + 16 connectors
+    await expect(catalog).not.toContainText(/live-verified|Connected|Online/);
+    await expect(page.getByText("SANDBOX").first()).toBeVisible();
+
+    // Add a webhook-only integration: the secret is shown once, and the status is honest.
+    const name = `E2E webhook ${Date.now()}`;
+    const add = page.locator("form").filter({ has: page.getByRole("button", { name: "Add in sandbox mode" }) });
+    await add.getByLabel("Connector").selectOption("generic.webhook");
+    await add.getByLabel("Name").fill(name);
+    await add.getByRole("button", { name: "Add in sandbox mode" }).click();
+    await expect(add.getByText("Shown once. Store it securely.")).toBeVisible();
+    await expect(page.getByText(/Webhook secret: whs_/)).toBeVisible();
+    const instances = page.getByRole("table", { name: "Connector instances" });
+    const row = instances.getByRole("row").filter({ hasText: name });
+    await expect(row).toContainText("Awaiting first run");
+    await expect(row).not.toContainText("Healthy");
+  });
+
+  test("scenario replay flows through the real pipeline into the SOC queue", async ({ page }) => {
+    await signIn(page, TENANT_ADMIN);
+    await page.goto("/connectors");
+    const scenario = page.getByRole("listitem").filter({ hasText: "Phishing to credential misuse" });
+    await scenario.getByRole("button", { name: "Replay" }).click();
+    await expect(scenario.getByRole("status")).toContainText(/Published \d+ records/);
+    await expect
+      .poll(
+        async () => {
+          await page.goto("/soc/siem");
+          return page.getByRole("tab", { name: /Sandbox pipeline alerts/ }).textContent();
+        },
+        { timeout: 45_000, intervals: [2_000] },
+      )
+      .toMatch(/[1-9]\d*/);
+    await page.getByRole("tab", { name: /Sandbox pipeline alerts/ }).click();
+    const table = page.getByRole("table", { name: "Security alerts ingested from sandbox connectors" });
+    await expect(table.getByRole("row").nth(1)).toBeVisible();
+    await expect(page.getByText("SANDBOX").first()).toBeVisible();
+  });
+
+  test("fault injection drives health to failing, and clearing it recovers", async ({ page }) => {
+    test.setTimeout(120_000);
+    await signIn(page, TENANT_ADMIN);
+    await page.goto("/connectors");
+    await page.getByRole("table", { name: "Connector instances" }).getByRole("link", { name: /^DEMO Wazuh/ }).click();
+    await expect(page.getByRole("heading", { level: 1, name: /^DEMO Wazuh/ })).toBeVisible();
+    const status = () => page.getByText(/^(Healthy|Degraded|Failing|Awaiting first run|Disabled)$/).first();
+
+    const faults = page.locator("form").filter({ has: page.getByLabel("Reject credentials") });
+    await page.getByLabel("Reject credentials").check();
+    await faults.getByRole("button", { name: "Apply" }).click();
+    await expect(faults.getByRole("status")).toContainText("Fault injection applied");
+    await expect.poll(async () => (await page.reload(), status().textContent()), { timeout: 45_000, intervals: [3_000] }).toBe("Failing");
+    await expect(page.getByText(/AuthError/).first()).toBeVisible();
+
+    await page.getByLabel("Reject credentials").uncheck();
+    await faults.getByRole("button", { name: "Apply" }).click();
+    await expect(faults.getByRole("status")).toContainText("Faults cleared");
+    await expect.poll(async () => (await page.reload(), status().textContent()), { timeout: 45_000, intervals: [3_000] }).toBe("Healthy");
   });
 
   test("command center, global search and real tenant admin coexist", async ({ page }) => {

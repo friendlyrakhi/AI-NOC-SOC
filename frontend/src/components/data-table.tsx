@@ -116,8 +116,8 @@ function Cell({ col, row }: { col: ColumnSpec; row: Row }) {
 export function toCsv(columns: ColumnSpec[], rows: Row[]): string {
   const esc = (v: unknown) => {
     let s = Array.isArray(v) ? v.join("; ") : v === null || v === undefined ? "" : String(v);
-    if (/^[=+\-@]/.test(s)) s = `'${s}`; // spreadsheet formula injection guard (threat model T16)
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; // spreadsheet formula injection guard (threat model T16, OWASP CSV injection)
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return [columns.map((c) => esc(c.header)).join(","), ...rows.map((r) => columns.map((c) => esc(r[c.key])).join(","))].join("\n");
 }

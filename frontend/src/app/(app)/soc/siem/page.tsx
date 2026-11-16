@@ -1,17 +1,20 @@
 import { BarList, SegmentBar } from "@/components/charts";
 import { DataTable } from "@/components/data-table";
-import { DemoBadge, DemoNotice, KpiTile } from "@/components/indicators";
+import { DemoBadge, DemoNotice, KpiTile, SandboxNotice } from "@/components/indicators";
 import { gate, Grid } from "@/components/page-states";
 import { Tabs } from "@/components/tabs";
 import { Card, PageHeader } from "@/components/ui";
 import { alertColumns, alertRow, siemColumns, siemRow } from "@/lib/rows";
 import { getDemo } from "@/lib/server/demo";
+import { getAlerts } from "@/lib/server/pipeline";
+import { pipelineAlertRow } from "@/lib/pipeline-rows";
 import { countBy, severityParts } from "@/lib/severity";
 
 export default async function SiemPage() {
   const { me, data, aggregate } = await getDemo();
   const denied = gate(me, "alert:read", "SIEM events");
   if (denied) return denied;
+  const ingested = aggregate ? null : await getAlerts("soc");
   const events = data.siem;
   const alerts = data.alerts.filter((a) => a.domain === "soc");
   const incidentFor = new Map(data.incidents.flatMap((i) => i.alertIds.map((a) => [a, i.number] as const)));
@@ -43,6 +46,27 @@ export default async function SiemPage() {
       <div className="mt-6">
         <Tabs
           tabs={[
+            ...(ingested
+              ? [
+                  {
+                    label: "Sandbox pipeline alerts",
+                    count: ingested.total,
+                    content: (
+                      <>
+                        <SandboxNotice />
+                        <DataTable
+                          caption="Security alerts ingested from sandbox connectors"
+                          rows={ingested.items.map(pipelineAlertRow)}
+                          columns={alertColumns(false, true)}
+                          searchPlaceholder="Search alert, host, technique…"
+                          exportName="soc-alerts-sandbox"
+                          emptyText="No security alerts ingested yet. Add a sandbox integration or replay a scenario under Connectors."
+                        />
+                      </>
+                    ),
+                  },
+                ]
+              : []),
             {
               label: "Events",
               count: events.length,

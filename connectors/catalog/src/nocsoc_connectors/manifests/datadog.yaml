@@ -1,0 +1,28 @@
+id: datadog
+name: Datadog
+vendor: Datadog
+category: observability
+version: 0.1.0
+sdk: ">=1.0,<2.0"
+certification: sandbox
+docs_reference: "Datadog API v1: events, hosts, metrics query; monitor webhook payloads"
+auth_types: [api_key_app_key]
+streams:
+  - {name: events, domain: noc, output: alert@1, default_interval_seconds: 60}
+  - {name: hosts, output: asset@1, default_interval_seconds: 900}
+  - {name: metrics, output: metric@1, default_interval_seconds: 60}
+webhook: true
+actions:
+  - {key: dd.mute_monitor, tier: T1, reversible: true}
+severity_map: {error: high, warning: medium, info: info, success: info}
+rate_limit_per_minute: 300
+config_schema:
+  type: object
+  properties:
+    site: {type: string, enum: [datadoghq.com, datadoghq.eu, us3.datadoghq.com, us5.datadoghq.com], default: datadoghq.eu}
+  additionalProperties: false
+secrets_schema:
+  type: object
+  properties:
+    api_key: {type: string}
+    app_key: {type: string}

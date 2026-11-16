@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     # Identity role (BYPASSRLS, identity tables only). Used only by app.core.identity/authz.
     auth_database_user: str = "nocsoc_auth"
     auth_database_password: SecretStr | None = None
+    # Ingest worker role (RLS enforced; tenant context set per message).
+    worker_database_user: str = "nocsoc_worker"
+    worker_database_password: SecretStr | None = None
     # Superuser: migrations and dev seeding only, never by the running API.
     postgres_user: str = "postgres"
     postgres_password: SecretStr | None = None
@@ -48,6 +51,20 @@ class Settings(BaseSettings):
     valkey_host: str = "valkey"
     valkey_port: int = 6379
     valkey_password: SecretStr | None = None
+
+    # --- Streaming (Kafka API: Redpanda in dev). Optional: features return 503 without it.
+    kafka_bootstrap: str | None = None
+    # --- Analytics (ClickHouse). Optional.
+    clickhouse_host: str | None = None
+    clickhouse_port: int = 8123
+    clickhouse_database: str = "nocsoc"
+    clickhouse_admin_user: str = "nocsoc_admin"
+    clickhouse_admin_password: SecretStr | None = None
+    clickhouse_ingest_password: SecretStr | None = None
+    clickhouse_reader_password: SecretStr | None = None
+    # Shared token the connector-runner presents on internal endpoints.
+    runner_token: SecretStr | None = None
+    webhook_max_bytes: int = Field(default=1_048_576, ge=1024, le=10_485_760)
 
     # --- Secrets (envelope encryption master key, 32 bytes hex) ---
     master_key: SecretStr | None = None
@@ -70,6 +87,10 @@ class Settings(BaseSettings):
     readiness_timeout_seconds: float = Field(default=2.0, gt=0, le=10)
 
     otel_enabled: bool = False
+    log_format: Literal["json", "text"] = "json"
+
+    # Per-tenant API budget for expensive endpoints (scenario replay, event search).
+    tenant_heavy_requests_per_minute: int = Field(default=60, ge=1, le=10_000)
 
     def _url(self, user: str, password: SecretStr | None) -> str:
         pw = quote(password.get_secret_value(), safe="") if password else ""
@@ -83,6 +104,9 @@ class Settings(BaseSettings):
 
     def auth_database_url(self) -> str:
         return self._url(self.auth_database_user, self.auth_database_password)
+
+    def worker_database_url(self) -> str:
+        return self._url(self.worker_database_user, self.worker_database_password)
 
     def superuser_database_url(self) -> str:
         return self._url(self.postgres_user, self.postgres_password)

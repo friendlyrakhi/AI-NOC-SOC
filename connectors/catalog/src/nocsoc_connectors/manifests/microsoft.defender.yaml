@@ -1,0 +1,28 @@
+id: microsoft.defender
+name: Microsoft Defender for Endpoint
+vendor: Microsoft
+category: edr
+version: 0.1.0
+sdk: ">=1.0,<2.0"
+certification: sandbox
+docs_reference: "Defender for Endpoint API: /api/alerts and /api/machines"
+auth_types: [service_principal]
+streams:
+  - {name: alerts, domain: soc, output: alert@1, default_interval_seconds: 60}
+  - {name: machines, output: asset@1, default_interval_seconds: 900}
+webhook: false
+actions:
+  - {key: mde.isolate_device, tier: T3, reversible: true}
+  - {key: mde.run_av_scan, tier: T2, reversible: false}
+severity_map: {High: high, Medium: medium, Low: low, Informational: info}
+rate_limit_per_minute: 100
+config_schema:
+  type: object
+  properties:
+    tenant: {type: string}
+  additionalProperties: false
+secrets_schema:
+  type: object
+  properties:
+    client_id: {type: string}
+    client_secret: {type: string}

@@ -11,7 +11,7 @@ cmd="${1:-status}"; shift || true
 
 profile_args() {
   local p; local -a out=()
-  if [[ $# -eq 0 ]]; then set -- core; fi
+  if [[ $# -eq 0 ]]; then set -- core stream; fi  # P2 default; `up core` for a lighter stack
   for p in "$@"; do out+=(--profile "$p"); done
   printf '%s\n' "${out[@]}"
 }

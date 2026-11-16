@@ -1,9 +1,16 @@
-"""Connector SDK (docs/06-connector-sdk.md). The full contract lands in P2.
+"""Connector SDK (docs/06-connector-sdk.md)."""
 
-P0 ships only the execution-mode guard, so the "no live execution" rule exists and is
-tested before any connector does.
-"""
-
+from nocsoc_connector_sdk.base import Connector, ConnectorContext, Paged, dig, load_manifest
+from nocsoc_connector_sdk.errors import (
+    AuthError,
+    ConfigError,
+    ConnectorError,
+    EgressBlockedError,
+    PermissionDeniedError,
+    RateLimitedError,
+    SchemaDriftError,
+    TransientError,
+)
 from nocsoc_connector_sdk.execution import (
     Certification,
     ConnectorMode,
@@ -11,13 +18,67 @@ from nocsoc_connector_sdk.execution import (
     ExecutionMode,
     assert_execution_allowed,
 )
+from nocsoc_connector_sdk.models import (
+    ActionInvocation,
+    ActionResult,
+    AlertV1,
+    AssetRef,
+    AssetV1,
+    Checkpoint,
+    FetchBudget,
+    FetchResult,
+    Manifest,
+    MetricPointV1,
+    NormalizedRecord,
+    Observable,
+    RawRecord,
+    SecurityEventV1,
+    TicketV1,
+    VulnFindingV1,
+)
+from nocsoc_connector_sdk.sandbox import GridStream, Simulator, World, iso, parse_ts, seeded
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 __all__ = [
+    "ActionInvocation",
+    "ActionResult",
+    "AlertV1",
+    "AssetRef",
+    "AssetV1",
+    "AuthError",
     "Certification",
+    "Checkpoint",
+    "ConfigError",
+    "Connector",
+    "ConnectorContext",
+    "ConnectorError",
     "ConnectorMode",
+    "EgressBlockedError",
     "ExecutionDisabledError",
     "ExecutionMode",
+    "FetchBudget",
+    "FetchResult",
+    "GridStream",
+    "Manifest",
+    "MetricPointV1",
+    "NormalizedRecord",
+    "Observable",
+    "Paged",
+    "PermissionDeniedError",
+    "RateLimitedError",
+    "RawRecord",
+    "SchemaDriftError",
+    "SecurityEventV1",
+    "Simulator",
+    "TicketV1",
+    "TransientError",
+    "VulnFindingV1",
+    "World",
     "assert_execution_allowed",
+    "dig",
+    "iso",
+    "load_manifest",
+    "parse_ts",
+    "seeded",
 ]

@@ -1,0 +1,124 @@
+[
+  {
+    "normalized": [
+      {
+        "asset_refs": [
+          {
+            "kind": "cloud_id",
+            "value": "i-02f2468ea4fb748e"
+          }
+        ],
+        "category": "cloud",
+        "dedup_key": "aws.cloudwatch:RDS-FreeStorage-low-i-02f2468ea4fb748e",
+        "description": "Threshold crossed: 1 datapoint for FreeStorageSpace",
+        "domain": "noc",
+        "kind": "alert",
+        "labels": {
+          "metric": "FreeStorageSpace"
+        },
+        "mitre_techniques": [],
+        "observables": [],
+        "observed_at": "2026-11-16T11:04:00Z",
+        "service_hint": null,
+        "severity": "info",
+        "source_alert_id": "RDS-FreeStorage-low-i-02f2468ea4fb748e@2026-11-16T11:04:00Z",
+        "status": "resolved",
+        "title": "CloudWatch alarm RDS-FreeStorage-low-i-02f2468ea4fb748e is OK"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:04:00Z",
+      "payload": {
+        "AlarmId": "RDS-FreeStorage-low-i-02f2468ea4fb748e@2026-11-16T11:04:00Z",
+        "AlarmName": "RDS-FreeStorage-low-i-02f2468ea4fb748e",
+        "HistoryData": "{\"newState\": {\"stateValue\": \"OK\", \"stateReason\": \"Threshold crossed: 1 datapoint for FreeStorageSpace\"}, \"metric\": \"FreeStorageSpace\", \"dimensions\": [{\"name\": \"InstanceId\", \"value\": \"i-02f2468ea4fb748e\"}]}",
+        "HistoryItemType": "StateUpdate",
+        "HistorySummary": "Alarm updated from OK to OK",
+        "Timestamp": "2026-11-16T11:04:00Z"
+      },
+      "schema": "aws.cloudwatch.alarm_history@1",
+      "source_id": "RDS-FreeStorage-low-i-02f2468ea4fb748e@2026-11-16T11:04:00Z"
+    },
+    "stream": "alarms"
+  },
+  {
+    "normalized": [
+      {
+        "attributes": {
+          "instance_type": "c6g.xlarge",
+          "provider": "aws",
+          "state": "running"
+        },
+        "environment": "prod",
+        "identifiers": [
+          {
+            "kind": "cloud_id",
+            "value": "i-35831288cb59ca30"
+          },
+          {
+            "kind": "ip",
+            "value": "10.80.7.51"
+          }
+        ],
+        "kind": "asset",
+        "name": "t87d9-app-01",
+        "observed_at": "2026-11-16T11:05:00Z",
+        "type": "cloud_resource"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:05:00Z",
+      "payload": {
+        "InstanceId": "i-35831288cb59ca30",
+        "InstanceType": "c6g.xlarge",
+        "ObservedAt": "2026-11-16T11:05:00Z",
+        "PrivateIpAddress": "10.80.7.51",
+        "State": {
+          "Name": "running"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "t87d9-app-01"
+          },
+          {
+            "Key": "env",
+            "Value": "prod"
+          }
+        ]
+      },
+      "schema": "aws.ec2.instance@1",
+      "source_id": "i-35831288cb59ca30"
+    },
+    "stream": "instances"
+  },
+  {
+    "normalized": [
+      {
+        "asset_ref": {
+          "kind": "cloud_id",
+          "value": "i-35831288cb59ca30"
+        },
+        "kind": "metric",
+        "name": "aws.CPUUtilization",
+        "observed_at": "2026-11-16T11:02:00Z",
+        "unit": "Percent",
+        "value": 31.15
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:02:00Z",
+      "payload": {
+        "Id": "cw-14956891",
+        "InstanceId": "i-35831288cb59ca30",
+        "MetricName": "CPUUtilization",
+        "Timestamp": "2026-11-16T11:02:00Z",
+        "Unit": "Percent",
+        "Value": 31.15
+      },
+      "schema": "aws.cloudwatch.datapoint@1",
+      "source_id": "cw-14956891"
+    },
+    "stream": "metrics"
+  }
+]

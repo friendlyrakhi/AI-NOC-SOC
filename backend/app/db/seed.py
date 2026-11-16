@@ -1,7 +1,8 @@
 """Development seed data: ``python -m app.db.seed``.
 
 Creates one MSP with two customers, users for each role, MFA for privileged users and the
-MSP's delegations (docs/08 P1, ADR-0016). Passwords and TOTP secrets are random and are
+MSP's delegations (docs/08 P1, ADR-0016), plus DEMO sandbox integrations per customer
+(P2). Passwords and TOTP secrets are random and are
 printed once, as JSON, for scripts/dev to store in infrastructure/secrets/dev-users.json
 (git-ignored). Mock data only: every address uses the reserved ``.example`` TLD.
 
@@ -192,9 +193,63 @@ def seed(settings: Settings) -> list[dict[str, object]] | None:
     return out
 
 
+# Sandbox integrations per demo tenant (P2). Names carry "DEMO" so nobody mistakes the
+# simulated sources for live ones; the database only allows mode = 'sandbox' anyway.
+DEMO_INTEGRATIONS: dict[str, list[str]] = {
+    "globex": ["solarwinds.orion", "prometheus", "datadog", "aws.cloudwatch", "servicenow.itsm", "tenable"],
+    "initech": [
+        "microsoft.sentinel",
+        "splunk",
+        "microsoft.defender",
+        "crowdstrike.falcon",
+        "wazuh",
+        "qualys.vmdr",
+        "datadog",
+    ],
+}
+
+
+def seed_demo_integrations(settings: Settings) -> int:
+    """Idempotent: adds the demo sandbox integrations a tenant does not have yet."""
+    if settings.environment != "dev":
+        raise SystemExit("seeding is only allowed in the dev environment")
+    from nocsoc_connectors import REGISTRY
+
+    engine = create_engine(settings.superuser_database_url())
+    created = 0
+    try:
+        with engine.begin() as conn:
+            for slug, connectors in DEMO_INTEGRATIONS.items():
+                tid = conn.execute(text("SELECT id FROM tenants WHERE slug = :s"), {"s": slug}).scalar_one_or_none()
+                if tid is None:
+                    continue
+                for cid in connectors:
+                    name = f"DEMO {REGISTRY[cid].manifest.name} (sandbox)"
+                    result = conn.execute(
+                        text(
+                            "INSERT INTO connector_instances (tenant_id, definition_id, name, mode) "
+                            "VALUES (:t, :d, :n, 'sandbox') ON CONFLICT (tenant_id, name) DO NOTHING"
+                        ),
+                        {"t": tid, "d": cid, "n": name},
+                    )
+                    if result.rowcount:
+                        created += 1
+                        _audit(
+                            conn,
+                            tid,
+                            "connector.create",
+                            {"definition_id": cid, "name": name, "source": "seed", "mode": "sandbox"},
+                        )
+    finally:
+        engine.dispose()
+    return created
+
+
 if __name__ == "__main__":
-    result = seed(get_settings())
+    settings = get_settings()
+    result = seed(settings)
+    integrations = seed_demo_integrations(settings)
     if result is None:
-        print(json.dumps({"status": "already_seeded"}))
+        print(json.dumps({"status": "already_seeded", "demo_integrations_created": integrations}))
         sys.exit(0)
-    print(json.dumps({"status": "seeded", "users": result}, indent=2))
+    print(json.dumps({"status": "seeded", "users": result, "demo_integrations_created": integrations}, indent=2))

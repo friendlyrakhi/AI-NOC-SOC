@@ -56,19 +56,28 @@ Legend: **Perm** = required permission. (P#) = phase delivered.
 | GET/POST | `/api-keys` · DELETE `/api-keys/{id}` | `apikey:manage` (step-up) |
 | GET/POST | `/platform/tenants` · PATCH `/platform/tenants/{tenant_id}` | platform admin |
 
-### 2.3 Integrations (P2)
+### 2.3 Integrations (P2, as built)
 | Method | Path | Perm | Notes |
 |--------|------|------|-------|
-| GET | `/connectors/definitions` | `connector:read` | catalog incl. certification level, capabilities, config JSON Schema |
-| GET/POST | `/connectors/instances` | `connector:read` / `connector:manage` | create with `mode` (`sandbox` only unless allowed) |
-| GET/PATCH/DELETE | `/connectors/instances/{id}` | `connector:read` / `connector:manage` | |
-| PUT | `/connectors/instances/{id}/credentials` | `connector:secret:write` (step-up) | write-only; response `204` |
-| POST | `/connectors/instances/{id}/test` | `connector:manage` | runs `test_connection` |
-| POST | `/connectors/instances/{id}/sync` | `connector:manage` | trigger fetch now; `Idempotency-Key` |
-| POST | `/connectors/instances/{id}/enable` · `/disable` | `connector:manage` | |
-| GET | `/connectors/instances/{id}/health` · `/runs` | `connector:read` | |
-| POST | `/connectors/instances/{id}/scenarios/{scenario}` | `connector:manage` | sandbox only: replay a scenario pack |
-| POST | `/ingest/webhooks/{instance_id}` | HMAC (no user auth) | `202`; size-limited |
+| GET | `/connectors/definitions` | `connector:read` | catalog: certification, streams, webhook, actions, config and secrets JSON Schemas, scenarios |
+| GET/POST | `/connectors/instances` | `connector:read` / `connector:manage` | always `mode = sandbox` (DB CHECK). Create returns the webhook secret **once** for webhook-capable connectors |
+| GET/PATCH/DELETE | `/connectors/instances/{id}` | `connector:read` / `connector:manage` (DELETE: step-up) | PATCH `name`, `config`, `enabled` with `version` (optimistic concurrency, `409 conflict.version`). Enable/disable is a PATCH |
+| PUT | `/connectors/instances/{id}/credentials` | `connector:secret:write` (step-up) | write-only, validated against the secrets schema, `204`; audited by field name only |
+| POST | `/connectors/instances/{id}/webhook-secret` | `connector:secret:write` (step-up) | rotate; new secret returned once, old one stops working |
+| POST | `/connectors/instances/{id}/test` | `connector:manage` | `test_connection` against the sandbox simulator |
+| POST | `/connectors/instances/{id}/sync` | `connector:manage` | `202`; the runner picks it up on its next poll |
+| GET | `/connectors/instances/{id}/runs` | `connector:read` | health lives on the instance (`status`, `status_detail`), set only by the runner |
+| GET | `/connectors/dead-letters?instance_id=` | `connector:read` | reason and detail only; envelope bodies are never returned |
+| GET | `/connectors/scenarios` | `connector:read` | per scenario: configured and missing connectors for this tenant |
+| POST | `/connectors/scenarios/{key}/replay?times=1..10` | `connector:manage` | publishes through the real pipeline; `503` without the event bus; per-tenant budget (`429`) |
+| POST | `/ingest/webhooks/{instance_id}` | HMAC (`x-required-permission: webhook_hmac`) | `202`; see §3 |
+| GET | `/internal/runner/work` · `/internal/runner/instances/{id}/credentials` · POST `…/report` | runner token (`internal`) | service-to-service only; not usable with a user session |
+
+### 2.3a Canonical events (P2)
+| Method | Path | Perm | Notes |
+|--------|------|------|-------|
+| GET | `/events` | `search:read` | canonical **EventV1** across NOC and SOC (classes: alert, detection, authentication, process, network, api_activity, ticket). Filters: `domain`, `class`, `severity`, `connector`, `q`, `since`/`until` (≤ 30 days). Keyset pagination with an opaque `cursor`. ClickHouse, tenant row policy. |
+| GET | `/events/histogram?bucket_minutes=` | `search:read` | counts per time bucket and severity (≤ 2000 buckets) |
 
 ### 2.4 Assets & services (P2/P3)
 | Method | Path | Perm |
@@ -89,6 +98,8 @@ Legend: **Perm** = required permission. (P#) = phase delivered.
 | PATCH | `/alerts/{id}` (assignee, labels) | `alert:update` | |
 | GET/POST | `/suppression-rules` · DELETE `/suppression-rules/{id}` | `alert:suppress` | |
 | GET | `/alerts/{id}/raw` | `alert:read_raw` | raw event from ClickHouse |
+
+**As built in P2:** `GET /alerts` (filters `domain`, `severity[]`, `status[]`, `connector`, `q`; `sort` = severity, last_seen or occurrences; offset pagination with `total`), `GET /alerts/summary` (cached per tenant for 10 s in Valkey, invalidated on triage), `GET /alerts/{id}`, `POST /alerts/{id}/transition` (`{status, version, note}`; allowed transitions enforced, `409` on stale version or re-open conflict), `GET /alerts/{id}/raw` (uses `alert:read` until `alert:read_raw` is added with P3). Also `GET /assets` and `GET /vulnerabilities` (open findings, known-exploited first). The remaining rows above arrive with P3.
 
 ### 2.6 Incidents (P3)
 | Method | Path | Perm |
@@ -189,7 +200,7 @@ X-NocSoc-Timestamp: 1763287200
 X-NocSoc-Nonce: 7b3f…
 X-NocSoc-Signature: v1=hex(HMAC_SHA256(secret, timestamp + "." + nonce + "." + raw_body))
 ```
-Rules: body ≤ 1 MB (configurable), timestamp within ±300 s, nonce unique per instance for 10 min. Responses are `202` (accepted), `401` (signature) or `409` (replay). For vendors with native signing schemes, a connector-specific verifier from the SDK is used instead.
+Rules: body ≤ 1 MB (configurable), timestamp within ±300 s, nonce unique per instance for 10 min, JSON depth ≤ 32, 600 requests/min per instance. Responses are `202` (accepted), `401` (signature; also for unknown or disabled instances, so existence is not revealed), `409` (replay), `413` (size), `422` (depth or unrecognized payload) or `429`. The tenant is taken from the instance record, never from the request. For vendors with native signing schemes, a connector-specific verifier from the SDK is used instead.
 
 ## 4. Outbound integration events (to ServiceNow & generic webhooks)
 

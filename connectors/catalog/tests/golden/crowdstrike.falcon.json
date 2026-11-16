@@ -1,0 +1,119 @@
+[
+  {
+    "normalized": [
+      {
+        "asset_refs": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-win-06"
+          },
+          {
+            "kind": "agent_id",
+            "value": "falcon:1c705991b6aaf755a3c990ab7e07e0aa"
+          }
+        ],
+        "category": "Discovery",
+        "dedup_key": "falcon:sandbox:ind:5982757",
+        "description": "Account enumeration on t87d9-win-06",
+        "domain": "soc",
+        "kind": "alert",
+        "labels": {},
+        "mitre_techniques": [
+          "T1087"
+        ],
+        "observables": [
+          {
+            "type": "sha256",
+            "value": "0550d5a5bdd4254ce65cdd4074f363fb0550d5a5bdd4254ce65cdd4074f363fb"
+          },
+          {
+            "type": "user",
+            "value": "a.smith"
+          },
+          {
+            "type": "process",
+            "value": "net user /domain"
+          }
+        ],
+        "observed_at": "2026-11-16T11:05:00Z",
+        "service_hint": null,
+        "severity": "medium",
+        "source_alert_id": "sandbox:ind:5982757",
+        "status": "new",
+        "title": "Account enumeration"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:05:00Z",
+      "payload": {
+        "cmdline": "net user /domain",
+        "composite_id": "sandbox:ind:5982757",
+        "created_timestamp": "2026-11-16T11:05:00Z",
+        "description": "Account enumeration on t87d9-win-06",
+        "device": {
+          "device_id": "1c705991b6aaf755a3c990ab7e07e0aa",
+          "hostname": "t87d9-win-06",
+          "local_ip": "10.39.38.74",
+          "platform_name": "Windows"
+        },
+        "display_name": "Account enumeration",
+        "filename": "powershell.exe",
+        "severity": 50,
+        "severity_name": "Medium",
+        "sha256": "0550d5a5bdd4254ce65cdd4074f363fb0550d5a5bdd4254ce65cdd4074f363fb",
+        "status": "new",
+        "tactic": "Discovery",
+        "technique": "Account Discovery",
+        "technique_id": "T1087",
+        "user_name": "a.smith"
+      },
+      "schema": "crowdstrike.alert@1",
+      "source_id": "sandbox:ind:5982757"
+    },
+    "stream": "alerts"
+  },
+  {
+    "normalized": [
+      {
+        "attributes": {
+          "containment": "normal",
+          "os": "Windows 11"
+        },
+        "environment": "unknown",
+        "identifiers": [
+          {
+            "kind": "hostname",
+            "value": "t87d9-win-06"
+          },
+          {
+            "kind": "agent_id",
+            "value": "falcon:1c705991b6aaf755a3c990ab7e07e0aa"
+          },
+          {
+            "kind": "ip",
+            "value": "10.39.38.74"
+          }
+        ],
+        "kind": "asset",
+        "name": "t87d9-win-06",
+        "observed_at": "2026-11-16T11:05:00Z",
+        "type": "host"
+      }
+    ],
+    "record": {
+      "observed_at": "2026-11-16T11:05:00Z",
+      "payload": {
+        "device_id": "1c705991b6aaf755a3c990ab7e07e0aa",
+        "hostname": "t87d9-win-06",
+        "last_seen": "2026-11-16T11:05:00Z",
+        "local_ip": "10.39.38.74",
+        "os_version": "Windows 11",
+        "platform_name": "Windows",
+        "status": "normal"
+      },
+      "schema": "crowdstrike.device@2",
+      "source_id": "1c705991b6aaf755a3c990ab7e07e0aa"
+    },
+    "stream": "hosts"
+  }
+]

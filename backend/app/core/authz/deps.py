@@ -5,8 +5,12 @@ Every route declares exactly one marker, which the route-permission coverage tes
 - ``**authenticated()``: any signed-in caller (``/auth/me``, logout, tenant switch)
 - ``**platform_admin()``: platform administrators
 - ``**requires("perm", step_up=..., aggregate=...)``: a tenant permission
+- ``**internal()``: service-to-service (connector-runner), shared token in ``X-Runner-Token``
+- ``**webhook_hmac()``: vendor webhooks, authenticated per instance by an HMAC signature that
+  the handler verifies (docs/06 §7)
 """
 
+import hmac
 import ipaddress
 from typing import Any
 from uuid import UUID
@@ -22,6 +26,8 @@ from app.services import Services, get_services
 PUBLIC = "public"
 AUTHENTICATED = "authenticated"
 PLATFORM_ADMIN = "platform_admin"
+INTERNAL = "internal"
+WEBHOOK_HMAC = "webhook_hmac"
 
 
 def client_ip(request: Request) -> str | None:
@@ -176,3 +182,23 @@ def platform_admin() -> dict[str, Any]:
 
 def public() -> dict[str, Any]:
     return {"openapi_extra": {"x-required-permission": PUBLIC}}
+
+
+def internal() -> dict[str, Any]:
+    async def check(request: Request, services: Services = Depends(get_services)) -> None:
+        expected = services.settings.runner_token
+        if expected is None:
+            raise ProblemError(503, "internal.disabled", "Runner endpoints disabled", "No runner token is configured.")
+        presented = request.headers.get("x-runner-token", "")
+        if not hmac.compare_digest(presented.encode(), expected.get_secret_value().encode()):
+            raise unauthorized("A valid runner token is required.")
+
+    return {
+        "dependencies": [Depends(check)],
+        "openapi_extra": {"x-required-permission": INTERNAL},
+        "include_in_schema": True,
+    }
+
+
+def webhook_hmac() -> dict[str, Any]:
+    return {"openapi_extra": {"x-required-permission": WEBHOOK_HMAC}}
