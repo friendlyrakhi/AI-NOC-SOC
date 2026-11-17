@@ -91,3 +91,35 @@ SCENARIOS: dict[str, Scenario] = {
 }
 
 __all__ = ["REGISTRY", "SCENARIOS", "Scenario"]
+
+
+# ----------------------------------------------------------------------- event-bus partitioning (NFR-2)
+# Streams whose records are independent telemetry: no ordering is needed between them (each is
+# idempotent through the ingest ledger), so they are spread over all partitions of a raw topic.
+TELEMETRY_OUTPUTS = frozenset({"metric@1", "security_event@1"})
+
+
+def is_telemetry_stream(connector_id: str, stream: str) -> bool:
+    cls = REGISTRY.get(connector_id)
+    if cls is None:
+        return False
+    return any(s.name == stream and s.output in TELEMETRY_OUTPUTS for s in cls.manifest.streams)
+
+
+def bus_key(tenant_id: str, instance_id: str, connector_id: str, stream: str, event_id: str) -> bytes:
+    """Kafka message key for a raw envelope.
+
+    Alerts, assets, tickets and findings keep one key per connector instance, so one instance's
+    records stay in order (de-duplication and correlation). Telemetry streams add the envelope id,
+    so a busy tenant's events spread over every partition and every ingest worker (P7 throughput).
+    """
+    if is_telemetry_stream(connector_id, stream):
+        return f"{tenant_id}:{instance_id}:{event_id}".encode()
+    return f"{tenant_id}:{instance_id}".encode()
+
+
+def bus_topic(connector_id: str, stream: str) -> str:
+    """Raw topic for a stream: telemetry goes to ``rawt.<connector>`` (batched, never waits for
+    correlation), everything else to ``raw.<connector>`` (ordered per connector instance)."""
+    prefix = "rawt." if is_telemetry_stream(connector_id, stream) else "raw."
+    return prefix + connector_id.replace(".", "_")

@@ -8,7 +8,7 @@ import asyncio
 import logging
 
 import clickhouse_connect
-from aiokafka.admin import AIOKafkaAdminClient, NewTopic
+from aiokafka.admin import AIOKafkaAdminClient, NewPartitions, NewTopic
 
 from app.analytics import schema, tls_options, users_and_policies
 from app.config import Settings, get_settings
@@ -19,15 +19,32 @@ logger = logging.getLogger("app.db.migrate_stream")
 HOUR_MS = 3_600_000
 
 
+# P7 throughput (NFR-2): enough partitions for several ingest workers per connector.
+RAW_PARTITIONS = 12
+
+
 def topics(connector_ids: list[str]) -> list[NewTopic]:
     raw = [
         NewTopic(
-            raw_topic(c), num_partitions=3, replication_factor=1, topic_configs={"retention.ms": str(24 * HOUR_MS)}
+            raw_topic(c),
+            num_partitions=RAW_PARTITIONS,
+            replication_factor=1,
+            topic_configs={"retention.ms": str(24 * HOUR_MS)},
+        )
+        for c in connector_ids
+    ]
+    telemetry = [
+        NewTopic(
+            raw_topic(c, telemetry=True),
+            num_partitions=RAW_PARTITIONS,
+            replication_factor=1,
+            topic_configs={"retention.ms": str(24 * HOUR_MS)},
         )
         for c in connector_ids
     ]
     return [
         *raw,
+        *telemetry,
         NewTopic(
             ALERTS_UPSERTED, num_partitions=3, replication_factor=1, topic_configs={"retention.ms": str(72 * HOUR_MS)}
         ),
@@ -54,7 +71,17 @@ async def setup_kafka(settings: Settings) -> None:
         missing = [t for t in topics(sorted(REGISTRY)) if t.name not in existing]
         if missing:
             await admin.create_topics(missing)
-        logger.info("kafka topics ready (%d created)", len(missing))
+        # Existing raw topics from before P7 have 3 partitions: grow them (partitions only ever grow).
+        raw = [t.name for t in topics(sorted(REGISTRY)) if t.name.startswith("raw.") and t.name in existing]
+        described = await admin.describe_topics(raw) if raw else []
+        grow = {
+            d["topic"]: NewPartitions(RAW_PARTITIONS)
+            for d in described
+            if len(d.get("partitions", [])) < RAW_PARTITIONS
+        }
+        if grow:
+            await admin.create_partitions(grow)
+        logger.info("kafka topics ready (%d created, %d grown)", len(missing), len(grow))
     finally:
         await admin.close()
 

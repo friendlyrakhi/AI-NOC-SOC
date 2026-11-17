@@ -48,7 +48,7 @@ How to run, check and recover the platform itself. This is not the SOC/NOC runbo
 1. "Ingest throughput by result". Is it `stored`, or a spike in `dead_letter` / `failed`?
 2. **Dead letters:** Connectors → the integration → dead letters show the reason (drift, quota, size).
    - `quota_exceeded` means a tenant exceeded its per-minute quota (`NOCSOC_TENANT_INGEST_RECORDS_PER_MINUTE`, default 6,000). The records are kept and can be replayed.
-3. **Throughput:** one ingest worker processes messages in order per partition. For more throughput, run more workers:
+3. **Throughput:** each worker runs two consumer groups: `nocsoc-ingest` for ordered topics (`raw.*`: alerts, assets, findings, tickets) and `nocsoc-ingest-telemetry` for telemetry topics (`rawt.*`, batched). One worker sustains about 1,450 telemetry events/s. Alerts are slower, because each one is correlated. Check lag per group with `docker exec nocsoc-redpanda-1 rpk group describe nocsoc-ingest` (and `...-telemetry`). For more throughput, run more workers:
    ```powershell
    docker compose ... up -d --scale ingest-worker=2
    ```

@@ -15,6 +15,7 @@ from typing import Any, Protocol
 from aiokafka import AIOKafkaProducer
 
 from nocsoc_connector_sdk import RawRecord
+from nocsoc_connectors import bus_key, bus_topic
 
 
 def raw_topic(connector_id: str) -> str:
@@ -62,6 +63,5 @@ class KafkaBus:
 
 
 async def publish(bus: Bus, env: dict[str, Any]) -> None:
-    await bus.send(
-        raw_topic(env["connector"]), f"{env['tenantid']}:{env['instanceid']}".encode(), json.dumps(env).encode()
-    )
+    key = bus_key(env["tenantid"], env["instanceid"], env["connector"], env["stream"], env["id"])
+    await bus.send(bus_topic(env["connector"], env["stream"]), key, json.dumps(env).encode())

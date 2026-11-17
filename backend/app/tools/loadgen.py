@@ -22,10 +22,10 @@ from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from aiokafka.admin import AIOKafkaAdminClient
 
 from app.config import get_settings
-from app.streaming import MAX_MESSAGE_BYTES, Envelope, raw_topic
-from app.workers.ingest import GROUP_ID
+from app.streaming import MAX_MESSAGE_BYTES, Envelope
+from app.workers.ingest import GROUP_ID, TELEMETRY_GROUP_ID
 from nocsoc_connector_sdk import ConnectorContext
-from nocsoc_connectors import REGISTRY, SCENARIOS
+from nocsoc_connectors import REGISTRY, SCENARIOS, bus_key, bus_topic
 
 TELEMETRY = {"metric@1", "security_event@1"}
 TELEMETRY_CONNECTORS = ("splunk", "prometheus", "datadog", "aws.cloudwatch")
@@ -85,7 +85,10 @@ def record_pool(tenant: str, instances: dict[str, str], scenario: str, variants:
 
 
 async def lag(admin: AIOKafkaAdminClient, consumer_end: Any, topics: list[str]) -> int:
-    committed = await admin.list_consumer_group_offsets(GROUP_ID)
+    committed = {
+        **(await admin.list_consumer_group_offsets(GROUP_ID)),
+        **(await admin.list_consumer_group_offsets(TELEMETRY_GROUP_ID)),
+    }
     parts = [tp for tp in committed if tp.topic in topics]
     if not parts:
         return -1
@@ -100,7 +103,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     instances = dict(pair.split("=", 1) for pair in args.instances.split(","))
     alerts = record_pool(args.tenant, instances, args.scenario, args.variants)
     events = await telemetry_pool(args.tenant, instances, 5) if args.mix == "realistic" else []
-    topics = sorted({raw_topic(e.connector) for e in alerts + events})
+    topics = sorted({bus_topic(e.connector, e.stream) for e in alerts + events})
     producer = AIOKafkaProducer(
         bootstrap_servers=settings.kafka_bootstrap,
         acks="all",
@@ -130,7 +133,8 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                 pool = alerts if not events or rng.random() < args.alert_share else events
                 template = pool[rng.randrange(len(pool))]
                 env = template.model_copy(update={"id": str(uuid.uuid4()), "time": datetime.now(UTC)})
-                futures.append(await producer.send(raw_topic(env.connector), env.to_bytes(), key=env.key()))
+                key = bus_key(str(env.tenantid), str(env.instanceid), env.connector, env.stream, env.id)
+                futures.append(await producer.send(bus_topic(env.connector, env.stream), env.to_bytes(), key=key))
                 sent += 1
             next_tick += tick
             delay = next_tick - time.monotonic()

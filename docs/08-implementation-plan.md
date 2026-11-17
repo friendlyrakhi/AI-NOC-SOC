@@ -186,7 +186,7 @@ Deliverables:
 
 **Exit criteria:** (status: [reports/P7-exit-review.md](reports/P7-exit-review.md))
 - [x] No open high/critical findings. ZAP shows no High; Schemathesis is clean on 162 operations; 3 fuzzing findings, the missing CSP `script-src` and the MFA-session gap were fixed.
-- [ ] NFR targets met or documented deviations accepted by you. NFR-1 and NFR-3 are met. **NFR-2: about 700 events/s sustained (a 1,000/s burst is absorbed without loss); awaiting your decision.**
+- [x] NFR targets met or documented deviations accepted by you. NFR-1, NFR-2 (1,451 events/s on one worker, after the throughput work) and NFR-3 are met.
 - [x] Restore from backup verified. Drill into an empty stack: 23/23 counts, audit chains and anchors, MFA sign-in.
 
 ---

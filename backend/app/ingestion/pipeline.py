@@ -295,7 +295,7 @@ class Ingestor:
         )
         return rows
 
-    async def prepare(self, value: bytes) -> Prepared | Outcome:
+    async def prepare(self, value: bytes, *, check_quota: bool = True) -> Prepared | Outcome:
         """Checks 1-3 (shape, ownership, quota, normalization). A dead letter is recorded here."""
         try:
             env = self._parse(value)
@@ -304,7 +304,7 @@ class Ingestor:
             return Outcome("dead_letter", dl.reason)
         try:
             owner = await self._verify_owner(env)
-            if self.quota is not None and not await self.quota(owner):
+            if check_quota and self.quota is not None and not await self.quota(owner):
                 raise DeadLetterError("quota_exceeded", "tenant ingest quota exceeded for this minute")
             records = self._normalize(env)
         except DeadLetterError as dl:
@@ -313,7 +313,9 @@ class Ingestor:
             return Outcome("dead_letter", dl.reason)
         return Prepared(env, owner, records)
 
-    async def store_telemetry_batch(self, tenant: UUID, items: Sequence[Prepared]) -> list[Outcome]:
+    async def store_telemetry_batch(
+        self, tenant: UUID, items: Sequence[Prepared]
+    ) -> tuple[list[Outcome], int | None, dict[str, list[list[Any]]]]:
         """P7 fast path (NFR-2): telemetry-only messages of one tenant in ONE transaction: one ledger
         insert for all their keys (duplicates drop out), one outbox row for all their rows."""
         keys = [record_key(p.env) for p in items]
@@ -339,8 +341,9 @@ class Ingestor:
                 for table, rows in self.telemetry_rows(p.env, tenant, p.records).items():
                     merged.setdefault(table, []).extend(rows)
                 outcomes.append(Outcome("stored", tenant=tenant, emitted_at=p.env.time))
-            await outbox.add(conn, self.writer.sinks, merged)
-        return outcomes
+            outbox_id = await outbox.add(conn, self.writer.sinks, merged)
+        # The caller delivers ``merged`` straight from memory and settles ``outbox_id`` (no read-back).
+        return outcomes, outbox_id, merged
 
     async def _store(self, env: Envelope, tenant: UUID, records: Sequence[Any]) -> Outcome:
         outcome = Outcome("stored")

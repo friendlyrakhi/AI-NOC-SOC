@@ -120,7 +120,13 @@ def ensure_instances(api: Api, connectors: list[str]) -> dict[str, str]:
 
 
 def ingest_test(
-    rate: float, seconds: float, scenario: str, quota: int, mix: str = "realistic", workers: int = 1
+    rate: float,
+    seconds: float,
+    scenario: str,
+    quota: int,
+    mix: str = "realistic",
+    workers: int = 1,
+    alert_share: float = 0.05,
 ) -> int:
     from nocsoc_connectors import SCENARIOS
 
@@ -149,7 +155,7 @@ def ingest_test(
             [*compose("nocsoc"), "--profile", "*", "run", "--rm", "--no-deps", "-T", "ingest-worker",
              "python", "-m", "app.tools.loadgen",
              "--tenant", me["active_tenant_id"], "--instances", pairs, "--scenario", scenario,
-             "--rate", str(rate), "--seconds", str(seconds), "--mix", mix]
+             "--rate", str(rate), "--seconds", str(seconds), "--mix", mix, "--alert-share", str(alert_share)]
         )  # fmt: skip
         report = json.loads(raw)
     finally:
@@ -165,6 +171,7 @@ def ingest_test(
     if dead is not None:
         report["dead_lettered"] = round(dead)
     report["workers"] = workers
+    report["alert_share"] = alert_share
     report["meets_nfr2"] = bool(report.get("drained") and report.get("sustained_processing_rate", 0) >= rate * 0.95)
     (out / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
@@ -185,12 +192,13 @@ def main() -> int:
     i.add_argument("--quota", type=int, default=200_000)
     i.add_argument("--mix", choices=["realistic", "alerts"], default="realistic")
     i.add_argument("--workers", type=int, default=1, help="ingest worker replicas during the run")
+    i.add_argument("--alert-share", type=float, default=0.05, help="share of alert messages (0 = telemetry only)")
     sub.add_parser("cleanup")
     args = p.parse_args()
     if args.cmd == "api":
         return api_test(args.vus, args.duration)
     if args.cmd == "ingest":
-        return ingest_test(args.rate, args.seconds, args.scenario, args.quota, args.mix, args.workers)
+        return ingest_test(args.rate, args.seconds, args.scenario, args.quota, args.mix, args.workers, args.alert_share)
     print(run([*compose("nocsoc"), "run", "--rm", "-T", "migrate", "python", "-m", "app.tools.seed_load", "--remove"]))
     return 0
 

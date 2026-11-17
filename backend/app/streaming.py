@@ -22,8 +22,11 @@ RAW_PREFIX = "raw."
 MAX_MESSAGE_BYTES = 1_048_576
 
 
-def raw_topic(connector_id: str) -> str:
-    return RAW_PREFIX + connector_id.replace(".", "_")
+TELEMETRY_PREFIX = "rawt."  # telemetry streams (security events, metrics): batched, unordered path
+
+
+def raw_topic(connector_id: str, *, telemetry: bool = False) -> str:
+    return (TELEMETRY_PREFIX if telemetry else RAW_PREFIX) + connector_id.replace(".", "_")
 
 
 Trigger = Literal["schedule", "manual", "scenario", "webhook"]
@@ -65,6 +68,8 @@ class Envelope(BaseModel):
         return self.model_dump_json().encode()
 
     def key(self) -> bytes:
+        """Per-instance key. Publishers that know the connector catalog pass
+        ``nocsoc_connectors.bus_key`` instead, which spreads telemetry streams (NFR-2)."""
         return f"{self.tenantid}:{self.instanceid}".encode()
 
 
@@ -94,11 +99,11 @@ class Publisher:
         """Metadata round trip to the cluster."""
         await self._producer.client.fetch_all_metadata()
 
-    async def publish(self, envelope: Envelope) -> None:
+    async def publish(self, envelope: Envelope, key: bytes | None = None, *, telemetry_topic: bool = False) -> None:
         await self._producer.send_and_wait(
-            raw_topic(envelope.connector),
+            raw_topic(envelope.connector, telemetry=telemetry_topic),
             envelope.to_bytes(),
-            key=envelope.key(),
+            key=key or envelope.key(),
             headers=telemetry.kafka_headers(),  # W3C trace context (NFR-6)
         )
 

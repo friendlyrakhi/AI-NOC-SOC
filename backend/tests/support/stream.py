@@ -46,15 +46,26 @@ async def _drain(settings: Settings, minimum: int, idle_seconds: float, max_seco
     await worker.start()
     loop = asyncio.get_running_loop()
     deadline = loop.time() + max_seconds
-    last_activity = loop.time()
     try:
+        # Both consumer groups must own their partitions before "idle" means anything (a fresh
+        # group needs a rebalance, a few seconds when the previous worker's membership lapses).
+        while loop.time() < deadline and not (worker.consumer.assignment() and worker.telemetry_consumer.assignment()):
+            for consumer in (worker.consumer, worker.telemetry_consumer):
+                batches = await consumer.getmany(timeout_ms=250, max_records=500)
+                await worker.process_batches(batches)
+                if batches:
+                    await worker.flush_telemetry()
+                    await consumer.commit()
+        last_activity = loop.time()
         while loop.time() < deadline:
-            batches = await worker.consumer.getmany(timeout_ms=500, max_records=200)
-            await worker.process_batches(batches)  # the production path (incl. the telemetry fast path)
-            if batches:
-                await worker.flush_telemetry()
-                await worker.consumer.commit()
-                last_activity = loop.time()
+            # Both consumer groups, as in production: ordered topics and telemetry topics.
+            for consumer in (worker.consumer, worker.telemetry_consumer):
+                batches = await consumer.getmany(timeout_ms=250, max_records=500)
+                await worker.process_batches(batches)  # the production path (incl. the telemetry fast path)
+                if batches:
+                    await worker.flush_telemetry()
+                    await consumer.commit()
+                    last_activity = loop.time()
             handled = sum(worker.stats.values())
             if handled >= minimum and loop.time() - last_activity >= idle_seconds:
                 break

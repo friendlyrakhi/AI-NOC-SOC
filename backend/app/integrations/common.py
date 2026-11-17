@@ -11,7 +11,7 @@ from app.errors import ProblemError
 from app.services import Services
 from app.streaming import Envelope, Trigger
 from nocsoc_connector_sdk import Connector, ConnectorContext, RawRecord
-from nocsoc_connectors import REGISTRY
+from nocsoc_connectors import REGISTRY, bus_key, is_telemetry_stream
 
 
 # Envelope-encryption context strings bind a ciphertext to one instance, so a ciphertext
@@ -67,15 +67,18 @@ async def publish_records(
 ) -> int:
     publisher = await require_publisher(services)
     for stream, record in records:
+        env = Envelope.for_record(
+            tenant_id=str(tenant_id),
+            instance_id=str(instance_id),
+            connector=connector_id,
+            stream=stream,
+            trigger=trigger,
+            record=record,
+        )
         await publisher.publish(
-            Envelope.for_record(
-                tenant_id=str(tenant_id),
-                instance_id=str(instance_id),
-                connector=connector_id,
-                stream=stream,
-                trigger=trigger,
-                record=record,
-            )
+            env,
+            bus_key(str(tenant_id), str(instance_id), connector_id, stream, env.id),
+            telemetry_topic=is_telemetry_stream(connector_id, stream),
         )
     return len(records)
 
