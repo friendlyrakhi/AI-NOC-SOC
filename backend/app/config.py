@@ -62,6 +62,18 @@ class Settings(BaseSettings):
     clickhouse_admin_password: SecretStr | None = None
     clickhouse_ingest_password: SecretStr | None = None
     clickhouse_reader_password: SecretStr | None = None
+    # --- Search and hunting (P6): OpenSearch with the security plugin. Optional: search falls
+    # back to Postgres and hunts answer 503 without it. Reader (API) and indexer (ingest worker)
+    # are separate store users; the admin password is used only by the one-shot setup job.
+    opensearch_url: str | None = None
+    opensearch_reader_password: SecretStr | None = None
+    opensearch_indexer_password: SecretStr | None = None
+    opensearch_admin_password: SecretStr | None = None
+    # Analytics projector (P6): Postgres state -> ClickHouse facts and the OpenSearch entity index.
+    projector_interval_seconds: float = Field(default=5.0, gt=0, le=3600)
+    # Hunts run asynchronously; per tenant at most this many at once and per hour.
+    hunt_max_concurrent: int = Field(default=2, ge=1, le=20)
+    hunt_runs_per_hour: int = Field(default=60, ge=1, le=10_000)
     # --- AI gateway (P4). Optional: AI endpoints return 503 without it.
     ai_gateway_url: str | None = None
     ai_gateway_token: SecretStr | None = None

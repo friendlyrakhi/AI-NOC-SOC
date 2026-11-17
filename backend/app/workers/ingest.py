@@ -26,6 +26,8 @@ from app.config import Settings, get_settings
 from app.db.engines import AppDatabase
 from app.ingestion.pipeline import DeadLetterError, Ingestor, Outcome
 from app.logging_setup import configure_logging
+from app.projector import Projector
+from app.searchstore import SearchStore
 from app.streaming import ALERTS_UPSERTED, MAX_MESSAGE_BYTES, Publisher
 
 logger = logging.getLogger("app.workers.ingest")
@@ -47,6 +49,7 @@ class Worker:
         self.settings = settings
         self.db = AppDatabase(settings, url=settings.worker_database_url())
         self.analytics: Any = None
+        self.search: SearchStore | None = None
         self.publisher = Publisher(settings.kafka_bootstrap)
         self.valkey = redis.Redis(
             host=settings.valkey_host,
@@ -69,17 +72,30 @@ class Worker:
     async def start(self) -> None:
         if self.settings.clickhouse_host and self.settings.clickhouse_ingest_password:
             self.analytics = await ingest_client(self.settings)
-        self.ingestor = Ingestor(self.db, self.analytics, self.settings.clickhouse_database, quota=self.within_quota)
+        if self.settings.opensearch_url and self.settings.opensearch_indexer_password:
+            self.search = SearchStore(
+                self.settings.opensearch_url,
+                "nocsoc_indexer",
+                self.settings.opensearch_indexer_password.get_secret_value(),
+            )
+        self.ingestor = Ingestor(
+            self.db, self.analytics, self.settings.clickhouse_database, quota=self.within_quota, search=self.search
+        )
+        self.projector = Projector(self.db, self.analytics, self.search, self.settings.clickhouse_database)
         await self.publisher.start()
         self.consumer.subscribe(pattern=TOPIC_PATTERN)
         await self.consumer.start()
-        logger.info("ingest worker started (analytics=%s)", self.analytics is not None)
+        logger.info(
+            "ingest worker started (analytics=%s, search=%s)", self.analytics is not None, self.search is not None
+        )
 
     async def stop(self) -> None:
         await self.consumer.stop()
         await self.publisher.stop()
         if self.analytics is not None:
             await self.analytics.close()
+        if self.search is not None:
+            await self.search.close()
         await self.valkey.aclose()
         await self.db.dispose()
         logger.info("ingest worker stopped %s", self.stats)
@@ -138,6 +154,9 @@ class Worker:
     async def run(self) -> None:
         await self.start()
         next_prune = 0.0
+        projector = asyncio.create_task(
+            self.projector.loop(self.stopping, self.settings.projector_interval_seconds), name="projector"
+        )
         try:
             while not self.stopping.is_set():
                 if time.monotonic() >= next_prune:
@@ -154,6 +173,9 @@ class Worker:
                 if batches:
                     await self.consumer.commit()
         finally:
+            self.stopping.set()
+            with contextlib.suppress(Exception):
+                await projector
             await self.stop()
 
 

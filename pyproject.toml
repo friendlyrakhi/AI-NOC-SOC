@@ -61,7 +61,7 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "N", "SIM", "RUF", "ASYNC", "PT"]
 known-first-party = ["app", "nocsoc_connector_sdk", "nocsoc_connectors", "connector_runner", "ai_gateway", "workflow_worker"]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**" = ["S101", "S105", "S106", "PT018"]
+"**/tests/**" = ["S101", "S105", "S106", "PT018", "S608"]
 "ai-engine/evals/**" = ["S101", "PT018"]
 "backend/migrations/**" = ["E501"]
 # SQL here is built only from module constants; all values are bound parameters (reviewed).
@@ -73,6 +73,10 @@ known-first-party = ["app", "nocsoc_connector_sdk", "nocsoc_connectors", "connec
 "backend/app/topology.py" = ["S608"]
 "backend/app/ai/**" = ["S608"]
 "backend/app/actions/**" = ["S608"]
+"backend/app/kpis.py" = ["S608"]
+"backend/app/reports.py" = ["S608"]
+"backend/app/hunting.py" = ["S608"]
+"backend/app/projector.py" = ["S608"]
 # Vendor-shaped sandbox payload literals read best on one line each.
 "connectors/catalog/src/nocsoc_connectors/**" = ["E501"]
 

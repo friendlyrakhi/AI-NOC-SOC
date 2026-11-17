@@ -24,6 +24,17 @@ for name in postgres_password database_password auth_database_password valkey_pa
     echo "==> secret $name generated"
   fi
 done
+# OpenSearch (P6) insists on upper, lower, digit and special characters; the fixed prefix only
+# satisfies that rule, the randomness is the 48 hex characters after it.
+for name in opensearch_admin_password opensearch_reader_password opensearch_indexer_password; do
+  f="infrastructure/secrets/$name"
+  if [[ -f "$f" && $rotate -eq 0 ]]; then
+    echo "==> secret $name exists (kept)"
+  else
+    python3 -c 'import secrets,sys; sys.stdout.write("Os-9" + secrets.token_hex(24))' > "$f"
+    echo "==> secret $name generated"
+  fi
+done
 
 # Build-time CA bundle: empty unless you need one (infrastructure/certs/README.md).
 [[ -f infrastructure/certs/extra-ca.pem ]] || : > infrastructure/certs/extra-ca.pem

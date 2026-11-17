@@ -392,6 +392,7 @@ class SearchHit(BaseModel):
 class SearchOut(BaseModel):
     query: str
     hits: list[SearchHit]
+    engine: Literal["opensearch", "postgres"] = "postgres"
 
 
 @router.get("/search", response_model=SearchOut, **requires("search:read"))
@@ -401,8 +402,26 @@ async def search(
     q: Annotated[str, Query(min_length=2, max_length=200)],
     limit: Annotated[int, Query(ge=1, le=50)] = 20,
 ) -> SearchOut:
-    """Postgres full-text search over alerts, incidents, assets and services (prefix match on
-    the last word). Results respect the caller's permissions per kind."""
+    """Global search over alerts, incidents, assets and services. Results respect the caller's
+    permissions per kind. Uses the tenant's OpenSearch entity index when the ``search`` profile
+    runs (P6), otherwise Postgres full-text search (prefix match on the last word). Services
+    always come from Postgres (few, and not indexed)."""
+    from app.search_api import entity_search
+
+    os_hits = await entity_search(services, p, q, limit)
+    if os_hits is not None:
+        if p.has("service:read"):
+            async with tenant_tx(services, p) as conn:
+                rows = await conn.execute(
+                    text(
+                        "SELECT 'service' AS kind, id, name AS title, 'tier ' || tier AS subtitle, "
+                        "NULL AS severity, updated_at AS at FROM services WHERE name ILIKE :like "
+                        "OR EXISTS (SELECT 1 FROM unnest(aliases) a WHERE a ILIKE :like) ORDER BY name LIMIT 5"
+                    ),
+                    {"like": f"%{q.replace('%', '').replace('_', '')}%"},
+                )
+                os_hits += [SearchHit(**r._mapping) for r in rows]
+        return SearchOut(query=q, hits=os_hits[:limit], engine="opensearch")
     words = [w for w in "".join(c if c.isalnum() or c in "-_." else " " for c in q).split() if w][:8]
     if not words:
         return SearchOut(query=q, hits=[])

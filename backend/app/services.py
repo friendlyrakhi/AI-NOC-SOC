@@ -31,6 +31,7 @@ class Services:
     # httpx transport for the AI gateway client; tests inject an in-process gateway here.
     ai_transport: Any = field(default=None, repr=False)
     _temporal: Any = field(default=None, repr=False)
+    _search: Any = field(default=None, repr=False)
     _temporal_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
 
     async def temporal(self) -> Any:
@@ -45,6 +46,20 @@ class Services:
                     self.settings.temporal_address, namespace=self.settings.temporal_namespace
                 )
         return self._temporal
+
+    def search_reader(self) -> Any:
+        """OpenSearch client as ``nocsoc_reader``. None when search is not configured."""
+        if not self.settings.opensearch_url or self.settings.opensearch_reader_password is None:
+            return None
+        if self._search is None:
+            from app.searchstore import SearchStore
+
+            self._search = SearchStore(
+                self.settings.opensearch_url,
+                "nocsoc_reader",
+                self.settings.opensearch_reader_password.get_secret_value(),
+            )
+        return self._search
 
     async def analytics_reader(self) -> Any:
         """ClickHouse client as ``nocsoc_reader`` (row policies). None when not configured."""
@@ -72,6 +87,8 @@ class Services:
             await self._publisher.stop()
         if self._reader is not None:
             await self._reader.close()
+        if self._search is not None:
+            await self._search.close()
         await self.app_db.dispose()
         await self.auth_db.dispose()
         await self.valkey.aclose()

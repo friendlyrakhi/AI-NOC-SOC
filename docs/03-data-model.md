@@ -204,6 +204,11 @@ Database `telemetry` (design). All tables are `MergeTree`-family with `tenant_id
 | `ai_usage` | MergeTree, `(tenant_id, ts)` | 400 d | Tokens/cost/latency. |
 | `connector_metrics` | MergeTree, `(tenant_id, instance_id, ts)` | 30 d | Lag, throughput, errors. |
 
+> **P6 as built:**
+> - Facts: `alert_facts`, `incident_facts` (with SLA due times) and `action_facts`, all ReplacingMergeTree(version) keyed by `(tenant_id, id)` and read with `FINAL`. The analytics projector writes them from Postgres.
+> - The reader row policy is `has(splitByChar(',', getSetting('SQL_tenant_id')), toString(tenant_id))`: one tenant, or the delegated customers of an MSP aggregate view.
+> - Rollups, `ai_usage` and `connector_metrics` are not built yet.
+
 Postgres is authoritative for alert and incident **state**. ClickHouse holds **facts** fed by events (`alerts.upserted`, `incidents.changed`) for analytics. Reconciliation runs a nightly job in non-dev environments.
 
 ## 4. OpenSearch (Phase 6)
@@ -214,6 +219,14 @@ Postgres is authoritative for alert and incident **state**. ClickHouse holds **f
 - The query façade only accepts a constrained query DSL or a translated Lucene/PPL subset, always pinned to the context tenant's alias. No raw index names come from clients.
 
 Before P6: global search uses Postgres `tsvector` on alerts/incidents/assets.
+
+> **P6 as built:**
+> - Two index families per tenant (tenant id as 32 hex characters): `t-{tenant}-events-YYYY.MM`, the canonical events (strict mapping; IPs typed `ip`; attributes stored but not indexed), and `t-{tenant}-entities`, holding alerts, incidents and assets for global search.
+> - The `nocsoc-retention` ISM policy deletes event indices after 30 days.
+> - The security plugin is on, with users `nocsoc_reader` (read `t-*`) and `nocsoc_indexer` (write `t-*`).
+> - Every query also filters on `tenant_id`. Postgres FTS stays as the fallback.
+>
+> Postgres additions (migration 0006): `projection_state` (worker-only watermarks per tenant, stream and sink), `reports`, `hunts` and `hunt_runs` (FORCE RLS), `updated_at` triggers on alerts, incidents, action requests and assets, and the `daily_briefing` AI task.
 
 ## 5. Event bus topics (Kafka API)
 

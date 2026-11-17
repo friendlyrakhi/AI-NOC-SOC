@@ -77,6 +77,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Pr
             columns={pipelineIncidentColumns}
             searchPlaceholder="Search number, title, service…"
             exportName="incidents"
+            dataSource="sandbox"
             emptyText={
               real
                 ? "No incidents yet. Replay a scenario under Connectors, or declare one below."

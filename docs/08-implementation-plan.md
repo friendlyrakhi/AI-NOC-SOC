@@ -167,10 +167,10 @@ Deliverables:
 - `search` profile: OpenSearch with per-tenant indices, ISM, query façade; SOC Investigate + Hunt; switch global search to OpenSearch.
 - AI daily briefing.
 
-**Exit criteria:**
-- [ ] Every KPI drillable to records; KPI values match a reference calculation in tests.
-- [ ] SEC-ISO-03 extended to OpenSearch.
-- [ ] Full profile memory within budget (≤ 10 GB) on this PC, or documented profile combos.
+**Exit criteria:** (status: [reports/P6-exit-review.md](reports/P6-exit-review.md))
+- [x] Every KPI drillable to records; KPI values match a reference calculation in tests.
+- [x] SEC-ISO-03 extended to OpenSearch.
+- [x] Full profile memory within budget (≤ 10 GB) on this PC, or documented profile combos. Measured at about 3.3 GB with all default profiles.
 
 ---
 

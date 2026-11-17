@@ -10,7 +10,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-Task = Literal["alert_summary", "incident_summary", "triage", "rca", "pir_draft", "query_assist", "chat"]
+Task = Literal[
+    "alert_summary", "incident_summary", "triage", "rca", "pir_draft", "query_assist", "chat", "daily_briefing"
+]
 ProviderName = Literal["mock", "ollama", "anthropic"]
 
 MAX_EVIDENCE_ITEMS = 60
@@ -24,7 +26,7 @@ class _M(BaseModel):
 
 class EvidenceItem(_M):
     ref: str = Field(pattern=r"^E\d{1,3}$")
-    type: Literal["alert", "incident", "timeline", "asset", "service", "vuln", "event", "runbook", "ticket"]
+    type: Literal["alert", "incident", "timeline", "asset", "service", "vuln", "event", "runbook", "ticket", "kpi"]
     id: str = Field(max_length=100)
     title: str = Field(max_length=500)
     text: str = Field(default="", max_length=MAX_EVIDENCE_TEXT)

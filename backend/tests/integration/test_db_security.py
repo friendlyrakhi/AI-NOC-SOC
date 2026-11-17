@@ -59,10 +59,14 @@ TENANT_SCOPED = {
     "action_requests",
     "approvals",
     "tenant_kill_switches",
+    "projection_state",
+    "reports",
+    "hunts",
+    "hunt_runs",
 }
 IDENTITY_ONLY = {"user_credentials", "sessions", "auth_challenges", "invitations"}  # no app policies
 GLOBAL = {"permissions", "alembic_version", "global_kill_switch"}
-WORKER_ONLY = {"ingest_seen"}  # the app role has no grant at all
+WORKER_ONLY = {"ingest_seen", "projection_state"}  # the app role has no grant at all
 AGGREGATE_READABLE = {"tenants", "audit_log", "alerts", "assets", "vuln_findings", "incidents", "services"}
 
 
@@ -99,7 +103,7 @@ def test_every_table_is_classified_and_protected(env: Env) -> None:
 @pytest.mark.parametrize("table", sorted(TENANT_SCOPED - {"role_permissions", "roles"} - WORKER_ONLY))
 def test_no_context_sees_nothing(env: Env, table: str) -> None:
     with app_conn(env) as c:
-        assert c.execute(f"SELECT count(*) FROM {table}").fetchone() == (0,)  # noqa: S608
+        assert c.execute(f"SELECT count(*) FROM {table}").fetchone() == (0,)
 
 
 def test_context_sees_only_own_tenant(env: Env) -> None:
@@ -145,7 +149,7 @@ def test_own_memberships_readable_but_not_writable_across_tenants(env: Env) -> N
 @pytest.mark.parametrize("table", sorted(IDENTITY_ONLY))
 def test_identity_tables_not_accessible_to_app(env: Env, table: str) -> None:
     with app_conn(env, "globex") as c, pytest.raises(errors.InsufficientPrivilege):
-        c.execute(f"SELECT 1 FROM {table} LIMIT 1")  # noqa: S608
+        c.execute(f"SELECT 1 FROM {table} LIMIT 1")
 
 
 def test_app_cannot_write_audit_directly(env: Env) -> None:
@@ -222,7 +226,7 @@ def worker_conn(env: Env, tenant: str | None = None) -> psycopg.Connection:
 )
 def test_worker_without_context_sees_nothing(env: Env, table: str) -> None:
     with worker_conn(env) as c:
-        assert c.execute(f"SELECT count(*) FROM {table}").fetchone() == (0,)  # noqa: S608
+        assert c.execute(f"SELECT count(*) FROM {table}").fetchone() == (0,)
 
 
 def test_worker_cannot_write_other_tenant_alert(env: Env) -> None:
@@ -239,7 +243,7 @@ def test_worker_cannot_write_other_tenant_alert(env: Env) -> None:
 )
 def test_worker_has_no_access_outside_ingestion(env: Env, table: str) -> None:
     with worker_conn(env, "globex") as c, pytest.raises(errors.InsufficientPrivilege):
-        c.execute(f"SELECT 1 FROM {table} LIMIT 1")  # noqa: S608
+        c.execute(f"SELECT 1 FROM {table} LIMIT 1")
 
 
 def test_connector_mode_is_sandbox_only(env: Env) -> None:

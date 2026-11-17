@@ -19,12 +19,16 @@ from app.core.tenancy.platform import router as platform_router
 from app.core.tenancy.router import router as tenancy_router
 from app.events import router as events_router
 from app.health import router as health_router
+from app.hunting import router as hunting_router
 from app.incidents.router import router as incidents_router
 from app.integrations.internal import router as internal_router
 from app.integrations.router import router as integrations_router
+from app.kpis import router as kpis_router
 from app.live import router as live_router
 from app.logging_setup import RequestContextMiddleware, configure_logging
 from app.mail import Mailer
+from app.reports import router as reports_router
+from app.search_api import router as search_router
 from app.services import build_services
 from app.telemetry import setup_telemetry
 from app.topology import router as topology_router
@@ -75,6 +79,10 @@ def create_app(settings: Settings | None = None, *, mailer: Mailer | None = None
         ai_router,
         knowledge_router,
         actions_router,
+        kpis_router,
+        search_router,
+        hunting_router,
+        reports_router,
         workflow_internal_router,
         events_router,
         internal_router,

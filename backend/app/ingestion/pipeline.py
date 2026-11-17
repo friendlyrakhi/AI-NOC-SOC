@@ -98,11 +98,14 @@ class Ingestor:
         analytics: Any | None = None,
         database: str = "nocsoc",
         quota: Callable[[UUID], Awaitable[bool]] | None = None,
+        search: Any | None = None,
     ) -> None:
         self.quota = quota
         self.db = db
         self.analytics = analytics
         self.database = database
+        # OpenSearch indexer (P6): canonical events become searchable per tenant.
+        self.search = search
 
     # ------------------------------------------------------------------ entry point
     async def process(self, value: bytes) -> Outcome:
@@ -123,7 +126,7 @@ class Ingestor:
 
         outcome = await self._store(env, owner, records)
         outcome.tenant = owner
-        if outcome.result == "stored" and self.analytics is not None:
+        if outcome.result == "stored":
             await self._write_telemetry(env, owner, outcome.telemetry)
         return outcome
 
@@ -518,14 +521,24 @@ ON CONFLICT (tenant_id, external_id) DO UPDATE SET
 
         A failed insert is logged and those telemetry rows are not retried (the alert, asset and
         finding writes are already committed). Documented as a P2 residual risk; a transactional
-        outbox for telemetry is planned with the analytics work in P6.
+        outbox for telemetry is still a residual risk (P7). The same applies to the OpenSearch copy of
+        canonical events.
         """
-        if self.analytics is None:
-            return
-        for table, data in rows.items():
-            if not data:
-                continue
+        if self.analytics is not None:
+            for table, data in rows.items():
+                if not data:
+                    continue
+                try:
+                    await self.analytics.insert(f"{self.database}.{table}", data, column_names=self.COLUMNS[table])
+                except Exception:
+                    logger.exception("telemetry insert failed (table=%s instance=%s)", table, env.instanceid)
+        events = rows.get("events") or []
+        if self.search is not None and events:
+            from app.searchstore import event_document
+
             try:
-                await self.analytics.insert(f"{self.database}.{table}", data, column_names=self.COLUMNS[table])
+                failed = await self.search.bulk([event_document(r, self.COLUMNS["events"]) for r in events])
+                if failed:
+                    logger.warning("search indexing failed for %d event(s) (instance=%s)", failed, env.instanceid)
             except Exception:
-                logger.exception("telemetry insert failed (table=%s instance=%s)", table, env.instanceid)
+                logger.exception("search indexing failed (instance=%s)", env.instanceid)

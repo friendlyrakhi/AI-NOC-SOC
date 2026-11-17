@@ -131,6 +131,8 @@ export interface DataTableProps {
   pageSize?: number;
   initialSort?: { key: string; dir: "asc" | "desc" };
   exportName?: string;
+  /** Labels the CSV file: generated DEMO data, or real platform data from sandbox connectors. */
+  dataSource?: "demo" | "sandbox";
   emptyText?: string;
 }
 
@@ -142,6 +144,7 @@ export function DataTable({
   pageSize: initialPageSize = 25,
   initialSort,
   exportName,
+  dataSource = "demo",
   emptyText = "No matching records.",
 }: DataTableProps) {
   const id = useId();
@@ -213,7 +216,7 @@ export function DataTable({
     const blob = new Blob([toCsv(columns, filtered)], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${exportName ?? "export"}-DEMO.csv`;
+    a.download = `${exportName ?? "export"}-${dataSource === "sandbox" ? "SANDBOX" : "DEMO"}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
   }

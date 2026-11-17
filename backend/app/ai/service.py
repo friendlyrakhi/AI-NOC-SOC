@@ -77,6 +77,8 @@ async def run(
             ev = await evidence.for_alert(services, conn, subject_id)
         elif subject_type == "incident" and subject_id:
             ev = await evidence.for_incident(services, conn, subject_id)
+        elif task == "daily_briefing":
+            ev = await evidence.for_briefing(services, conn, p.tenant_id)
         else:
             ev = evidence.EvidenceSet(subject={"type": "none"})
 

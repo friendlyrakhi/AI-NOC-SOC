@@ -73,6 +73,7 @@ PERMISSIONS: dict[str, str] = {
     "search:read": "Search",
     "hunt:run": "Run hunts",
     "report:read": "View reports",
+    "report:create": "Create and delete saved reports",
 }
 
 PRIVILEGED: frozenset[str] = frozenset(
@@ -183,6 +184,7 @@ SYSTEM_ROLES: tuple[SystemRole, ...] = (
                 "action:request",
                 "analytics:read",
                 "report:read",
+                "report:create",
                 "msp:aggregate_read",
             }
         ),
@@ -217,6 +219,7 @@ SYSTEM_ROLES: tuple[SystemRole, ...] = (
                 "action:request",
                 "hunt:run",
                 "report:read",
+                "report:create",
                 "msp:aggregate_read",
             }
         ),
@@ -246,6 +249,7 @@ SYSTEM_ROLES: tuple[SystemRole, ...] = (
                 "action:request",
                 "action:approve",
                 "report:read",
+                "report:create",
                 "msp:aggregate_read",
             }
         ),

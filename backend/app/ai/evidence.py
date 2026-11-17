@@ -209,3 +209,62 @@ async def for_incident(services: Services, conn: AsyncConnection, incident_id: U
         ev.add("timeline", t.id, title, summary, at=t.at, kind=t.kind)
     await _add_runbooks(services, conn, ev, f"{inc.title}\n" + "\n".join(alert_titles[:8]))
     return ev
+
+
+async def for_briefing(services: Services, conn: AsyncConnection, tenant_id: UUID | None) -> EvidenceSet:
+    """Daily briefing (P6): the last 24 hours' KPIs (ClickHouse facts, when available), the open
+    P1/P2 incidents and notable alerts not yet in an incident. Postgres reads use the caller's
+    RLS transaction; the KPI read carries the same tenant to the analytics row policies."""
+    from app.errors import ProblemError
+    from app.kpis import build_kpis, compute
+
+    ev = EvidenceSet(subject={"type": "none", "briefing": "24h"})
+    try:
+        _since, _now, inc, al = await compute(services, tenant_id, "all", "24h")  # type: ignore[arg-type]
+        for k in build_kpis(inc[0] if inc else {}, al[0] if al else {}):
+            ev.add(
+                "kpi",
+                k.key,
+                f"{k.label} (last 24 h)",
+                k.description,
+                key=k.key,
+                label=k.label,
+                value=k.value,
+                unit=k.unit,
+                basis=k.basis,
+                numerator=k.numerator,
+                period="24h",
+            )
+    except ProblemError:
+        pass  # analytics not running: the briefing says so in its gaps
+    incidents = await conn.execute(
+        text(
+            "SELECT id, number, title, summary, severity, priority, status, domain, detected_at FROM incidents "
+            "WHERE status NOT IN ('resolved', 'closed') AND merged_into_id IS NULL AND priority IN ('P1', 'P2') "
+            "ORDER BY priority, detected_at DESC LIMIT 10"
+        )
+    )
+    for i in incidents:
+        ev.add(
+            "incident",
+            i.id,
+            f"{i.number} {i.title}",
+            i.summary,
+            severity=i.severity,
+            at=i.detected_at,
+            number=i.number,
+            priority=i.priority,
+            status=i.status,
+            domain=i.domain,
+        )
+    alerts = await conn.execute(
+        text(
+            f"SELECT {_ALERT_COLS} WHERE a.severity IN ('critical', 'high') "  # nosec B608
+            "AND a.status NOT IN ('resolved', 'closed', 'suppressed') AND a.last_seen > now() - interval '24 hours' "
+            "AND NOT EXISTS (SELECT 1 FROM incident_alerts ia WHERE ia.alert_id = a.id) "
+            "ORDER BY severity_rank(a.severity), a.last_seen DESC LIMIT 10"
+        )
+    )
+    for a in alerts:
+        _add_alert(ev, a)
+    return ev

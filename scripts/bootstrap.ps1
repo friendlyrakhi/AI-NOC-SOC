@@ -35,6 +35,18 @@ foreach ($name in 'postgres_password', 'database_password', 'auth_database_passw
     Write-Step "secret $name generated"
 }
 
+# OpenSearch (P6) insists on upper, lower, digit and special characters; the fixed prefix only
+# satisfies that rule, the randomness is the 48 hex characters after it.
+foreach ($name in 'opensearch_admin_password', 'opensearch_reader_password', 'opensearch_indexer_password') {
+    $path = Join-Path $secretsDir $name
+    if ((Test-Path $path) -and -not $RotateSecrets) {
+        Write-Step "secret $name exists (kept)"
+        continue
+    }
+    [System.IO.File]::WriteAllText($path, 'Os-9' + (New-HexSecret 24))
+    Write-Step "secret $name generated"
+}
+
 # Restrict the secrets folder to the current user (threat model T19).
 & icacls $secretsDir /inheritance:r /grant:r "$($env:USERNAME):(OI)(CI)F" | Out-Null
 Write-Step "secrets folder ACL restricted to $($env:USERNAME)"

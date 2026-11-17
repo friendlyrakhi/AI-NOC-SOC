@@ -6,13 +6,19 @@ import { gate } from "@/components/page-states";
 import { Card, PageHeader } from "@/components/ui";
 import { apiGetOptional, type Schemas } from "@/lib/server/api";
 import { getDemo } from "@/lib/server/demo";
+import { getCustomerKpis, kpiValue, period as toPeriod } from "@/lib/server/insights";
+import { PeriodNav } from "@/components/insights";
 import { OPEN_INCIDENT } from "@/lib/severity";
 
 /**
  * Customer portfolio. Tenant names and delegations are real (API); per-customer
  * operational metrics are DEMO data until the P2/P3 APIs exist.
  */
-export default async function CustomersOverview() {
+export default async function CustomersOverview({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { me, data, aggregate } = await getDemo();
   const denied = gate(me, "portal:command", "Customers");
   if (denied) return denied;
@@ -47,6 +53,57 @@ export default async function CustomersOverview() {
             </p>
           )}
         </Card>
+      </>
+    );
+  }
+
+  const p = toPeriod((await searchParams).period);
+  const live = await getCustomerKpis(p);
+  if (live) {
+    const cell = (kpis: (typeof live)[number]["kpis"], key: string) => {
+      const k = kpis.find((x) => x.key === key);
+      return k?.value ?? null;
+    };
+    const fmt = (kpis: (typeof live)[number]["kpis"], key: string) => {
+      const k = kpis.find((x) => x.key === key);
+      if (!k) return "—";
+      const v = kpiValue(k);
+      return v.unit ? `${v.value} ${v.unit}` : v.value;
+    };
+    return (
+      <>
+        <PageHeader
+          title="Customers"
+          description="The same KPIs for every customer your MSP role is delegated to (read-only). Open a customer in the tenant selector to drill into its records."
+          actions={<PeriodNav current={p} base="/command/customers" />}
+        />
+        <DataTable
+          caption="Customer KPI comparison"
+          rows={live.map((c) => ({
+            _id: c.tenant_id,
+            name: c.name,
+            opened: cell(c.kpis, "incidents_opened"),
+            open: cell(c.kpis, "open_incidents"),
+            mtta: fmt(c.kpis, "mtta"),
+            mttr: fmt(c.kpis, "mttr"),
+            resolveSla: fmt(c.kpis, "resolve_sla"),
+            alerts: cell(c.kpis, "alert_volume"),
+            noise: fmt(c.kpis, "noise_ratio"),
+          }))}
+          columns={[
+            { key: "name", header: "Customer" },
+            { key: "opened", header: "Incidents opened", type: "number", align: "right" },
+            { key: "open", header: "Still open", type: "number", align: "right" },
+            { key: "mtta", header: "MTTA", align: "right" },
+            { key: "mttr", header: "MTTR", align: "right" },
+            { key: "resolveSla", header: "Resolve SLA met", align: "right" },
+            { key: "alerts", header: "Alerts", type: "number", align: "right" },
+            { key: "noise", header: "Noise ratio", align: "right" },
+          ]}
+          initialSort={{ key: "open", dir: "desc" }}
+          exportName={`customer-kpis-${p}`}
+          dataSource="sandbox"
+        />
       </>
     );
   }

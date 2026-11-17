@@ -28,6 +28,7 @@ const TASK_LABEL: Record<string, string> = {
   chat: "Answer",
   alert_summary: "Alert summary",
   query_assist: "Search suggestion",
+  daily_briefing: "Daily briefing",
 };
 
 const STATUS: Record<Run["validation_status"], { label: string; tone: string }> = {
@@ -41,10 +42,11 @@ function evidenceHref(e: Run["evidence"][number]): string | null {
   if (e.type === "incident") return `/incidents/${e.id}`;
   if (e.type === "runbook") return `/knowledge/${e.id}`;
   if (e.type === "service") return `/noc/topology/${e.id}`;
+  if (e.type === "kpi") return `/command/kpi/${e.id}?period=24h`;
   return null;
 }
 
-function RunCard({ run, back, incidentId, requestable }: { run: Run; back: string; incidentId: string; requestable: CatalogEntry[] | null }) {
+export function RunCard({ run, back, incidentId, requestable }: { run: Run; back: string; incidentId: string; requestable: CatalogEntry[] | null }) {
   const out = run.output as Output;
   const anchor = (ref: string) => `ev-${run.id.slice(0, 8)}-${ref}`;
   const byRef = new Map(run.evidence.map((e) => [e.ref, e]));
@@ -105,7 +107,7 @@ function RunCard({ run, back, incidentId, requestable }: { run: Run; back: strin
               <li key={i}>
                 <span className="font-mono">{a.action_key}</span>: {a.rationale}{" "}
                 {a.citations.map((ref) => (
-                  <a key={ref} href={`#${anchor(ref)}`} className="text-primary ml-1 font-mono hover:underline">
+                  <a key={ref} href={`#${anchor(ref)}`} className="text-primary ml-1 font-mono underline">
                     {ref}
                   </a>
                 ))}
@@ -137,7 +139,7 @@ function RunCard({ run, back, incidentId, requestable }: { run: Run; back: strin
               <li key={e.ref} id={anchor(e.ref)} className="scroll-mt-20">
                 <span className="font-mono">{e.ref}</span> <span className="text-muted">{e.type}</span>{" "}
                 {href ? (
-                  <Link href={href} className="text-primary hover:underline">
+                  <Link href={href} className="text-primary underline">
                     {e.title}
                   </Link>
                 ) : (

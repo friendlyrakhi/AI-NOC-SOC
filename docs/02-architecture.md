@@ -194,7 +194,7 @@ OpenTelemetry SDKs in Python and Next.js → OTel Collector. Dev default: the co
 | `analytics` | clickhouse (capped `max_server_memory_usage`) | +1–1.5 GB | P2 |
 | `workflow` | temporal (dev server, SQLite volume; as built in P5), workflow-worker | +~0.2 GB measured | P5 |
 | `ai` | ai-gateway; optional `ollama` (CPU-only small models; big RAM cost) | +0.3 GB (+4–8 GB w/ Ollama) | P4 |
-| `search` | opensearch single-node (`-Xms1g -Xmx1g`, security plugin on), dashboards optional | +1.5–2 GB | P6 |
+| `search` | opensearch single-node (`-Xms512m -Xmx512m`, security plugin on) + one-shot `opensearch-setup`; no dashboards (as built in P6) | +~1.2 GB measured | P6 |
 | `observability` | otel-collector, grafana/otel-lgtm | +1 GB | P7 (optional earlier) |
 
 All ports bind to `127.0.0.1` (API host port 8100 by default; see `.env`). Named volumes, retention TTLs on ClickHouse tables, and Redpanda retention (e.g. 24 h / 2 GB in dev).

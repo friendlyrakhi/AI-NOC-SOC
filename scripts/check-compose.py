@@ -47,13 +47,14 @@ def check(config: dict) -> list[str]:
             problems.append(f"{name}: no memory limit")
     problems += check_isolation(config)
     problems += check_ai_isolation(config)
+    problems += check_search_isolation(config)
     return problems
 
 
 # Services that run connector code must not share a network with the data stores (T13).
 # The workflow worker also runs connector code (action executors), so the same rules apply.
 CONNECTOR_RUNTIMES = {"connector-runner", "workflow-worker"}
-DATA_STORES = {"postgres", "valkey", "clickhouse"}
+DATA_STORES = {"postgres", "valkey", "clickhouse", "opensearch"}
 
 
 def _networks(svc: dict) -> set[str]:
@@ -71,11 +72,11 @@ def check_isolation(config: dict) -> list[str]:
             if shared:
                 problems.append(f"{runtime}: shares network {sorted(shared)} with data store {store}")
         for key in rt.get("environment") or {}:
-            if "DATABASE" in key or "CLICKHOUSE" in key or "VALKEY" in key:
+            if "DATABASE" in key or "CLICKHOUSE" in key or "VALKEY" in key or "OPENSEARCH" in key:
                 problems.append(f"{runtime}: has data-store setting {key}")
         for secret in rt.get("secrets") or []:
             source = str(secret.get("source", ""))
-            if any(s in source for s in ("database", "clickhouse", "valkey", "postgres", "master_key")):
+            if any(s in source for s in ("database", "clickhouse", "valkey", "postgres", "master_key", "opensearch")):
                 problems.append(f"{runtime}: has data-store secret {secret.get('source')}")
     return problems
 
@@ -107,6 +108,37 @@ def check_ai_isolation(config: dict) -> list[str]:
                 problems.append(f"{runtime}: unexpected secret {secret.get('source')}")
         if (rt.get("environment") or {}).get("NOCSOC_AI_CLOUD_EGRESS_ENABLED", "false").lower() != "false":
             problems.append(f"{runtime}: cloud egress must be off in the base compose file")
+    return problems
+
+
+# OpenSearch (P6, SEC-ISO-03): reachable only on the internal 'search' network, never published,
+# and each store credential held only by the service that needs it.
+SEARCH_MEMBERS = {"opensearch", "opensearch-setup", "api", "ingest-worker"}
+SEARCH_SECRETS = {
+    "opensearch_admin_password": {"opensearch", "opensearch-setup"},
+    "opensearch_reader_password": {"opensearch-setup", "api"},
+    "opensearch_indexer_password": {"opensearch-setup", "ingest-worker"},
+}
+
+
+def check_search_isolation(config: dict) -> list[str]:
+    services = config.get("services", {})
+    if "opensearch" not in services:
+        return []
+    problems = []
+    if not (config.get("networks", {}).get("search") or {}).get("internal"):
+        problems.append("network 'search' must be internal (no internet)")
+    if _networks(services["opensearch"]) != {"search"}:
+        problems.append("opensearch: must be attached only to network 'search'")
+    if services["opensearch"].get("ports"):
+        problems.append("opensearch: must not publish ports")
+    for name, svc in services.items():
+        if "search" in _networks(svc) and name not in SEARCH_MEMBERS:
+            problems.append(f"{name}: must not join the 'search' network")
+        for secret in svc.get("secrets") or []:
+            source = str(secret.get("source", ""))
+            if source in SEARCH_SECRETS and name not in SEARCH_SECRETS[source]:
+                problems.append(f"{name}: must not hold {source}")
     return problems
 
 

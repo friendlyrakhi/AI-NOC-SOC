@@ -56,7 +56,7 @@ export const PORTAL_SECTIONS: Record<Exclude<PortalKey, "admin" | "ops">, NavSec
       items: [
         { label: "Overview", href: "/soc", perm: "portal:soc" },
         { label: "Cases", href: "/incidents?portal=soc", perm: "incident:read" },
-        { label: "Investigations", href: "/soc/investigations", perm: "incident:read" },
+        { label: "Investigate", href: "/soc/investigations", perm: "search:read" },
         { label: "SIEM events", href: "/soc/siem", perm: "alert:read" },
         { label: "EDR / XDR", href: "/soc/edr", perm: "alert:read" },
       ],
@@ -65,7 +65,7 @@ export const PORTAL_SECTIONS: Record<Exclude<PortalKey, "admin" | "ops">, NavSec
       title: "Threat & exposure",
       items: [
         { label: "Threat intelligence", href: "/soc/threat-intel", perm: "alert:read" },
-        { label: "AI threat hunting", href: "/soc/hunting", perm: "hunt:run" },
+        { label: "Threat hunting", href: "/soc/hunting", perm: "hunt:run" },
         { label: "MITRE ATT&CK", href: "/soc/mitre", perm: "alert:read" },
         { label: "Vulnerabilities", href: "/soc/vulnerabilities", perm: "vuln:read" },
         { label: "VAPT", href: "/soc/vapt", perm: "vuln:read" },

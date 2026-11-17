@@ -358,6 +358,94 @@ def _chat(req: GenerateRequest) -> AiOutput:
     return AiOutput(claims=claims, gaps=["Answer assembled from matching evidence only."], confidence=0.5)
 
 
+def _fmt_kpi(e: EvidenceItem) -> str:
+    unit, value = _a(e, "unit"), e.attributes.get("value")
+    if value is None:
+        return "not available"
+    if unit == "ratio":
+        return f"{float(value) * 100:.0f}%"
+    if unit == "seconds":
+        minutes = float(value) / 60
+        return f"{minutes:.0f} min" if minutes < 120 else f"{minutes / 60:.1f} h"
+    return f"{float(value):.0f}"
+
+
+def _briefing(req: GenerateRequest) -> AiOutput:
+    kpis = {_a(e, "key"): e for e in _of(req, "kpi") if not e.suspicious}
+    incidents = [e for e in _of(req, "incident") if not e.suspicious]
+    alerts = _by_severity(e for e in _of(req, "alert") if not e.suspicious)
+    claims: list[Claim] = []
+    gaps: list[str] = []
+    if not (kpis or incidents or alerts):
+        return AiOutput(gaps=["No KPIs, incidents or alerts were available for the briefing period."])
+    if "incidents_opened" in kpis:
+        opened, still = kpis["incidents_opened"], kpis.get("open_incidents")
+        text = f"In the last 24 hours {_fmt_kpi(opened)} incident(s) were opened"
+        cites = [opened.ref]
+        if still is not None:
+            text += f"; {_fmt_kpi(still)} of them are still open"
+            cites.append(still.ref)
+        claims.append(Claim(text=text + ".", citations=cites))
+    timing = [kpis[k] for k in ("mtta", "mttr") if k in kpis and kpis[k].attributes.get("value") is not None]
+    if timing:
+        claims.append(
+            Claim(
+                text="Response times: " + ", ".join(f"{_a(k, 'label')} {_fmt_kpi(k)}" for k in timing) + ".",
+                citations=[k.ref for k in timing],
+            )
+        )
+    sla = [kpis[k] for k in ("ack_sla", "resolve_sla") if k in kpis and kpis[k].attributes.get("value") is not None]
+    if sla:
+        claims.append(
+            Claim(
+                text="SLA attainment: " + ", ".join(f"{_a(k, 'label')} {_fmt_kpi(k)}" for k in sla) + ".",
+                citations=[k.ref for k in sla],
+            )
+        )
+    elif kpis:
+        gaps.append("No SLA outcome was decided in the period yet.")
+    if "alert_volume" in kpis:
+        vol, noise = kpis["alert_volume"], kpis.get("noise_ratio")
+        text = f"{_fmt_kpi(vol)} alert(s) arrived"
+        cites = [vol.ref]
+        if noise is not None and noise.attributes.get("value") is not None:
+            text += f", and {_fmt_kpi(noise)} of them were not escalated to an incident"
+            cites.append(noise.ref)
+        claims.append(Claim(text=text + ".", citations=cites))
+    if not kpis:
+        gaps.append("Analytics were not available, so the briefing has no KPIs.")
+    if incidents:
+        top = incidents[:3]
+        claims.append(
+            Claim(
+                text=f"{len(incidents)} priority incident(s) are open; most urgent: "
+                + "; ".join(f"{_a(i, 'number')} ({_a(i, 'priority')}, {_a(i, 'status')}) {_t(i, 80)}" for i in top)
+                + ".",
+                citations=[i.ref for i in top],
+            )
+        )
+    else:
+        gaps.append("No P1 or P2 incident is open.")
+    if alerts:
+        claims.append(
+            Claim(
+                text=f"{len(alerts)} notable alert(s) are not in an incident yet, e.g. "
+                + "; ".join(f'"{_t(a, 70)}" on {_a(a, "asset")}' for a in alerts[:3])
+                + ".",
+                citations=[a.ref for a in alerts[:3]],
+            )
+        )
+    suspicious = [e.ref for e in req.evidence if e.suspicious]
+    if suspicious:
+        claims.append(
+            Claim(
+                text=f"{len(suspicious)} evidence item(s) contain instruction-like text and were treated as data only.",
+                citations=suspicious[:10],
+            )
+        )
+    return AiOutput(claims=claims, gaps=gaps, confidence=0.8 if kpis else 0.5)
+
+
 TASKS = {
     "alert_summary": _alert_summary,
     "incident_summary": _incident_summary,
@@ -366,6 +454,7 @@ TASKS = {
     "pir_draft": _pir,
     "query_assist": _query,
     "chat": _chat,
+    "daily_briefing": _briefing,
 }
 
 

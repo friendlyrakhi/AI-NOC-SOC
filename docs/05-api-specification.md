@@ -205,6 +205,25 @@ AI response shape:
 | POST | `/hunt/queries` · GET `/hunt/queries/{id}/results` | `hunt:run` (async, quota-limited) |
 | GET/POST | `/reports` · GET `/reports/{id}/export?format=pdf|csv` | `report:read` / `report:create` |
 
+**As built in P6:**
+- `GET /analytics/kpis?domain=all|noc|soc&period=24h|7d|30d|90d` (`analytics:read`) returns 9 KPIs. Each has `value`, `numerator` and `basis`.
+- `GET /analytics/kpis/{key}/records` returns the records behind a KPI's basis. `counted` marks the numerator, and `seconds` carries MTTA/MTTR durations.
+- `GET /analytics/timeseries?metric=alerts|incidents&interval=hour|day&group_by=none|severity|domain`.
+- `GET /command-center/overview` (`portal:command` + `analytics:read`) and `GET /command-center/customers` (the same, MSP aggregate mode only).
+- Search:
+  - `GET /search?q=` (global) uses OpenSearch when the search profile runs, otherwise Postgres; the response includes `engine`.
+  - `POST /search/events` (`search:read`) takes `{query: EventQuery, limit, facets}`. `EventQuery` allows only text, domain, classes, severity, connector, asset, actor_user, ip, mitre and since/until (at most 30 days); other fields are rejected with 422.
+- Hunting (`hunt:run`):
+  - `GET/POST /hunts` and `DELETE /hunts/{hunt_id}`;
+  - `POST /hunt/queries {hunt_id | query}` returns 202 and runs asynchronously;
+  - `GET /hunt/queries[/{hunt_run_id}[/results]]` and `POST /hunt/queries/{hunt_run_id}/attach` (`incident:comment`);
+  - limits: `429 hunt.busy` and `hunt.quota`.
+- Reports:
+  - `GET /reports` (`report:read`), `POST /reports` and `DELETE /reports/{id}` (`report:create`, new);
+  - `GET /reports/{id}/export?format=csv|pdf` (`report:read`, audited).
+- AI: `POST /ai/briefing` (`ai:use` + `analytics:read` + `incident:read`) and `GET /ai/briefing/latest` (`analytics:read`).
+- `/metrics/query` is deferred (no consumer yet).
+
 ### 2.11 Audit & admin
 | Method | Path | Perm |
 |--------|------|------|

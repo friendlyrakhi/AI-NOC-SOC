@@ -62,7 +62,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         )}
         <div className="ml-auto flex flex-wrap items-center gap-3">
           {me.mode === "aggregate" && (
-            <span className="bg-accent-command/15 text-accent-command rounded px-2 py-0.5 text-xs font-medium">
+            <span className="border-accent-command bg-accent-command/10 text-foreground rounded border px-2 py-0.5 text-xs font-medium">
               All customers · read-only
             </span>
           )}

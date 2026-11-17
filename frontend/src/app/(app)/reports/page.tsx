@@ -1,63 +1,109 @@
-import { BarList, TimeSeriesChart } from "@/components/charts";
-import { DemoBadge, DemoNotice } from "@/components/indicators";
+import { ActionForm } from "@/components/action-form";
+import { SandboxNotice } from "@/components/indicators";
 import { gate } from "@/components/page-states";
-import { Card, PageHeader } from "@/components/ui";
-import { minutes } from "@/lib/format";
-import { getDemo } from "@/lib/server/demo";
-import { avgLast } from "@/lib/severity";
+import { Card, Field, PageHeader } from "@/components/ui";
+import { createReport, deleteReport } from "@/app/actions/insights";
+import { formatTime } from "@/lib/format";
+import { getMe } from "@/lib/server/api";
+import { getReports } from "@/lib/server/insights";
+
+import { DemoReports } from "./_demo";
+
+const KIND: Record<string, { label: string; text: string }> = {
+  kpi_summary: { label: "KPI summary", text: "The Command Center KPIs with their numerators and bases." },
+  incident_register: { label: "Incident register", text: "Every incident in the period with its timestamps." },
+  sla_report: { label: "SLA report", text: "Per-incident SLA outcomes plus MTTA, MTTR and attainment." },
+};
 
 export default async function ReportsPage() {
-  const { me, data, aggregate } = await getDemo();
+  const me = await getMe();
   const denied = gate(me, "report:read", "Reports");
   if (denied) return denied;
-  const k = data.kpis;
-  const breakdown = (aggregate ? data.tenants : []).map((t) => ({
-    label: t.name,
-    value: data.incidents.filter((i) => i.tenant.id === t.id).length,
-  }));
+  const reports = me.mode === "tenant" ? await getReports() : null;
+  if (!reports) return <DemoReports />;
+  const canCreate = me.permissions.includes("report:create");
   return (
     <>
       <PageHeader
         title="Reports"
-        description="30-day operational and security reporting. Every chart has a table view and a CSV download (files are suffixed -DEMO)."
-        actions={<DemoBadge />}
+        description="Saved report definitions. Every export is computed fresh from current data, downloaded as CSV or PDF, and recorded in the audit log."
       />
-      <DemoNotice>Scheduled PDF reports and the analytics store (ClickHouse) arrive in phase P6. Figures below are demo data.</DemoNotice>
-
-      <h2 className="mb-3 text-sm font-semibold">Operations</h2>
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card title={`Mean time to acknowledge · 7-day average ${minutes(avgLast(k.mttaMinutes))}`}>
-          <TimeSeriesChart title="Daily mean time to acknowledge" series={[{ name: "MTTA", slot: 1, points: k.mttaMinutes }]} format="minutes" exportName="report-mtta" />
-        </Card>
-        <Card title={`Mean time to resolve · 7-day average ${minutes(avgLast(k.mttrMinutes))}`}>
-          <TimeSeriesChart title="Daily mean time to resolve" series={[{ name: "MTTR", slot: 1, points: k.mttrMinutes }]} format="minutes" exportName="report-mttr" />
-        </Card>
-        <Card title="Alert volume by domain">
-          <TimeSeriesChart
-            title="Daily alert volume for NOC and SOC"
-            series={[
-              { name: "NOC", slot: 1, points: k.nocAlerts },
-              { name: "SOC", slot: 2, points: k.socAlerts },
-            ]}
-            exportName="report-alert-volume"
-          />
-        </Card>
-        <Card title="SLA attainment">
-          <TimeSeriesChart title="Daily SLA attainment" series={[{ name: "SLA attainment", slot: 1, points: k.slaAttainment }]} format="percent" yMin={90} yMax={100} exportName="report-sla" />
-        </Card>
-      </div>
-
-      <h2 className="mt-8 mb-3 text-sm font-semibold">Security and automation</h2>
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card title="Open critical vulnerabilities">
-          <TimeSeriesChart title="Open critical vulnerabilities per day" series={[{ name: "Critical vulnerabilities", slot: 2, points: k.criticalVulns }]} exportName="report-critical-vulns" />
-        </Card>
-        <Card title="Automation rate (simulated actions)">
-          <TimeSeriesChart title="Share of response steps automated per day" series={[{ name: "Automation rate", slot: 3, points: k.automationRate }]} format="percent" exportName="report-automation" />
-        </Card>
-        {aggregate && (
-          <Card title="Incidents by customer (30 days)">
-            <BarList label="Incidents by customer" items={breakdown} />
+      <SandboxNotice>Reports are built from sandbox connector data and demo seed content processed by the real platform.</SandboxNotice>
+      <div className="grid gap-6 xl:grid-cols-3">
+        <section className="xl:col-span-2" aria-labelledby="saved-reports">
+          <h2 id="saved-reports" className="mb-3 text-sm font-semibold">
+            Saved reports
+          </h2>
+          {reports.length === 0 ? (
+            <Card>
+              <p className="text-muted text-sm">No saved reports yet.</p>
+            </Card>
+          ) : (
+            <ul className="space-y-3" aria-label="Saved reports">
+              {reports.map((r) => (
+                <li key={r.id}>
+                  <Card>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-semibold">{r.name}</h3>
+                        <p className="text-muted text-xs">
+                          {KIND[r.kind]?.label ?? r.kind} · {r.domain === "all" ? "all domains" : r.domain.toUpperCase()} · last {r.period}
+                          {r.last_exported_at ? ` · last exported ${formatTime(r.last_exported_at)}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <a className="btn btn-primary text-xs" href={`/api/reports/${r.id}/export?format=csv`} download>
+                          Download CSV
+                        </a>
+                        <a className="btn btn-ghost border-border border text-xs" href={`/api/reports/${r.id}/export?format=pdf`} download>
+                          Download PDF
+                        </a>
+                        {canCreate && (
+                          <ActionForm action={deleteReport} submitLabel="Delete" danger className="flex items-center gap-2">
+                            <input type="hidden" name="report_id" value={r.id} />
+                          </ActionForm>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        {canCreate && (
+          <Card title="New report">
+            <ActionForm action={createReport} submitLabel="Save report" resetOnSuccess>
+              <Field label="Name">
+                <input name="name" required maxLength={200} className="input w-full" />
+              </Field>
+              <Field label="Type">
+                <select name="kind" className="input w-full" defaultValue="kpi_summary">
+                  {Object.entries(KIND).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v.label}: {v.text}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Domain">
+                  <select name="domain" className="input w-full" defaultValue="all">
+                    <option value="all">All</option>
+                    <option value="noc">NOC</option>
+                    <option value="soc">SOC</option>
+                  </select>
+                </Field>
+                <Field label="Period">
+                  <select name="period" className="input w-full" defaultValue="7d">
+                    <option value="24h">Last 24 hours</option>
+                    <option value="7d">Last 7 days</option>
+                    <option value="30d">Last 30 days</option>
+                    <option value="90d">Last 90 days</option>
+                  </select>
+                </Field>
+              </div>
+            </ActionForm>
           </Card>
         )}
       </div>

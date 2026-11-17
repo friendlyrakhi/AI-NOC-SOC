@@ -97,11 +97,11 @@ test.describe("SOC portal", () => {
     await signIn(page, SOC_RESPONDER);
     for (const [path, heading] of [
       ["/soc", "AI SOC"],
-      ["/soc/investigations", "Investigations"],
+      ["/soc/investigations", "Investigate"],
       ["/soc/siem", "SIEM events"],
       ["/soc/edr", "EDR / XDR"],
       ["/soc/threat-intel", "Threat intelligence"],
-      ["/soc/hunting", "AI threat hunting"],
+      ["/soc/hunting", "Threat hunting"],
       ["/soc/mitre", "MITRE ATT&CK"],
       ["/soc/vulnerabilities", "Vulnerability management"],
       ["/soc/vapt", "VAPT"],
@@ -208,7 +208,8 @@ test.describe("Administration and shared areas", () => {
     await signIn(page, TENANT_ADMIN);
     await page.goto("/command");
     await expect(page.getByRole("heading", { level: 1, name: "Executive Command Center" })).toBeVisible();
-    await expect(page.getByRole("img", { name: /alert volume/i }).first()).toBeVisible();
+    // Real KPIs (P6): every tile links to the records behind it.
+    await expect(page.getByRole("link", { name: /^Incidents opened/ }).first()).toBeVisible();
     await page.getByRole("searchbox", { name: /Search incidents/ }).fill("payments");
     await page.getByRole("searchbox", { name: /Search incidents/ }).press("Enter");
     await expect(page.getByRole("status").filter({ hasText: /results? for/ })).toBeVisible();

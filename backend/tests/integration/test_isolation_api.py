@@ -138,7 +138,23 @@ def initech_ids(api: Api) -> dict[str, str]:
             "'pending_approval', now() + interval '1 hour') RETURNING id",
             (t, incident.json()["id"]),
         ).fetchone()[0]
+        hunt_id = c.execute(
+            "INSERT INTO hunts (tenant_id, name, query) VALUES (%s, 'Initech hunt', '{\"text\": \"x\"}') RETURNING id",
+            (t,),
+        ).fetchone()[0]
+        hunt_run_id = c.execute(
+            "INSERT INTO hunt_runs (tenant_id, hunt_id, query, status) VALUES (%s, %s, '{}', 'succeeded') RETURNING id",
+            (t, hunt_id),
+        ).fetchone()[0]
+        report_id = c.execute(
+            "INSERT INTO reports (tenant_id, name, kind) VALUES (%s, 'Initech report', 'incident_register') "
+            "RETURNING id",
+            (t,),
+        ).fetchone()[0]
     return {
+        "hunt_id": str(hunt_id),
+        "hunt_run_id": str(hunt_run_id),
+        "report_id": str(report_id),
         "request_id": str(action_request),
         "playbook_id": pb.json()["id"],
         "version": "1",
@@ -216,6 +232,11 @@ def _initech_snapshot(api: Api) -> tuple:  # type: ignore[type-arg]
             c.execute("SELECT id, status, steps FROM workflow_runs WHERE tenant_id = %s ORDER BY id", (t,)).fetchall(),
             c.execute("SELECT * FROM tenant_kill_switches WHERE tenant_id = %s", (t,)).fetchall(),
             c.execute("SELECT * FROM action_policies WHERE tenant_id = %s ORDER BY action_key", (t,)).fetchall(),
+            c.execute("SELECT id, name, query FROM hunts WHERE tenant_id = %s ORDER BY id", (t,)).fetchall(),
+            c.execute("SELECT id, status FROM hunt_runs WHERE tenant_id = %s ORDER BY id", (t,)).fetchall(),
+            c.execute(
+                "SELECT id, name, last_exported_at FROM reports WHERE tenant_id = %s ORDER BY id", (t,)
+            ).fetchall(),
         )
 
 

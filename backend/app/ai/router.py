@@ -266,3 +266,27 @@ async def usage(services: Svc, p: P) -> AiUsageOut:
         feedback_up=fb.get(1, 0),
         feedback_down=fb.get(-1, 0),
     )
+
+
+# ============================================================ daily briefing (P6)
+@router.post("/briefing", response_model=AiRunOut, **requires("ai:use"))
+async def generate_briefing(services: Svc, p: P) -> AiRunOut:
+    """Generates the daily briefing from the last 24 hours' KPIs, open priority incidents and
+    notable unescalated alerts. AI-generated and cited like every other AI output."""
+    _need(p, "analytics:read")
+    _need(p, "incident:read")
+    return AiRunOut(**await service.run(services, p, task="daily_briefing", subject_type="none", subject_id=None))
+
+
+@router.get("/briefing/latest", response_model=AiRunOut | None, **requires("analytics:read"))
+async def latest_briefing(services: Svc, p: P) -> AiRunOut | None:
+    """The most recent briefing (read-only, also for executives without ai:use), or null."""
+    async with tenant_tx(services, p) as conn:
+        run_id = (
+            await conn.execute(
+                text("SELECT id FROM ai_runs WHERE task = 'daily_briefing' ORDER BY created_at DESC LIMIT 1")
+            )
+        ).scalar_one_or_none()
+    if run_id is None:
+        return None
+    return AiRunOut(**await service.get_run(services, p, run_id))

@@ -123,7 +123,7 @@ services:
   api:
     <<: *hardening
     profiles: [core]
-    networks: [data, bus, frontend, ai, workflow]
+    networks: [data, bus, frontend, ai, workflow, search]
     build:
       context: ../..
       dockerfile: infrastructure/docker/api.Dockerfile
@@ -145,6 +145,8 @@ services:
       NOCSOC_AI_GATEWAY_URL: http://ai-gateway:8200
       # Optional (workflow profile). Without it action requests and playbooks answer 503.
       NOCSOC_TEMPORAL_ADDRESS: temporal:7233
+      # Optional (search profile). Without it global search uses Postgres and hunts answer 503.
+      NOCSOC_OPENSEARCH_URL: http://opensearch:9200
     # File names carry the settings prefix: pydantic-settings maps NOCSOC_<FIELD> to them.
     secrets:
       - source: ai_gateway_token
@@ -163,6 +165,8 @@ services:
         target: nocsoc_runner_token
       - source: clickhouse_reader_password
         target: nocsoc_clickhouse_reader_password
+      - source: opensearch_reader_password
+        target: nocsoc_opensearch_reader_password
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -222,6 +226,61 @@ services:
       retries: 12
       start_period: 10s
     mem_limit: 512m
+
+  opensearch:
+    <<: *hardening
+    profiles: [search]
+    networks: [search]
+    # OpenSearch 3.8.0 single node, security plugin on (users and roles), HTTP inside the
+    # internal network only. The admin password is read from its secret at start.
+    image: opensearchproject/opensearch@sha256:fafe3fc3587088674669235575aa166228c48bdb940294a8cdbbc1da75236a40
+    entrypoint:
+      - sh
+      - -c
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD="$$(cat /run/secrets/opensearch_admin_password)" exec ./opensearch-docker-entrypoint.sh opensearch
+    environment:
+      discovery.type: single-node
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+      plugins.security.ssl.http.enabled: "false"
+      DISABLE_PERFORMANCE_ANALYZER_AGENT_CLI: "true"
+    secrets: [opensearch_admin_password]
+    volumes:
+      - osdata:/usr/share/opensearch/data
+    ulimits:
+      nofile: { soft: 65536, hard: 65536 }
+    cap_drop: [ALL]
+    healthcheck:
+      # 401 means the HTTP layer and the security plugin are up (anonymous access is refused).
+      test: ["CMD-SHELL", "[ \"$$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:9200/)\" = 401 ]"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    mem_limit: 1536m
+
+  opensearch-setup:
+    <<: *hardening
+    restart: "no"
+    profiles: [search]
+    networks: [search]
+    image: nocsoc/api:dev
+    command: ["python", "-m", "app.db.migrate_search"]
+    environment:
+      NOCSOC_OPENSEARCH_URL: http://opensearch:9200
+    # The only holder of the admin password besides OpenSearch itself.
+    secrets:
+      - source: opensearch_admin_password
+        target: nocsoc_opensearch_admin_password
+      - source: opensearch_reader_password
+        target: nocsoc_opensearch_reader_password
+      - source: opensearch_indexer_password
+        target: nocsoc_opensearch_indexer_password
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    depends_on:
+      opensearch: { condition: service_healthy }
+    mem_limit: 256m
 
   workflow-worker:
     <<: *hardening
@@ -365,7 +424,7 @@ services:
   ingest-worker:
     <<: *hardening
     profiles: [stream]
-    networks: [data, bus]
+    networks: [data, bus, search]
     image: nocsoc/api:dev
     command: ["python", "-m", "app.workers.ingest"]
     environment:
@@ -373,6 +432,8 @@ services:
       NOCSOC_KAFKA_BOOTSTRAP: redpanda:9092
       NOCSOC_CLICKHOUSE_HOST: clickhouse
       NOCSOC_VALKEY_HOST: valkey
+      # Optional (search profile): indexes canonical events and runs the search projection.
+      NOCSOC_OPENSEARCH_URL: http://opensearch:9200
     # Least privilege: the RLS-bound worker role and the INSERT-only ClickHouse user. Valkey
     # carries live-update notifications and per-tenant ingest quotas.
     secrets:
@@ -382,6 +443,8 @@ services:
         target: nocsoc_clickhouse_ingest_password
       - source: valkey_password
         target: nocsoc_valkey_password
+      - source: opensearch_indexer_password
+        target: nocsoc_opensearch_indexer_password
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -442,6 +505,12 @@ secrets:
     file: ../secrets/ai_gateway_token
   workflow_token:
     file: ../secrets/workflow_token
+  opensearch_admin_password:
+    file: ../secrets/opensearch_admin_password
+  opensearch_reader_password:
+    file: ../secrets/opensearch_reader_password
+  opensearch_indexer_password:
+    file: ../secrets/opensearch_indexer_password
 
 # Segmentation (threat model T13, SEC-CON-02): the connector runner reaches only the API and
 # the event bus. Data stores sit on `data`, which the runner is not attached to.
@@ -457,8 +526,12 @@ networks:
   # Temporal, the workflow worker and the API. The worker has no route to the data stores.
   workflow:
     internal: true
+  # OpenSearch, its setup job, the API (reader) and the ingest worker (indexer).
+  search:
+    internal: true
 
 volumes:
+  osdata:
   temporaldata:
   pgdata:
   redpandadata:

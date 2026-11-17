@@ -14,4 +14,7 @@ Use Postgres full-text search until P6, then add the `search` profile.
 OpenSearch from P2; ClickHouse-only search.
 
 ## Consequences
-The global-search API is designed behind a façade so the backend can switch.
+The global-search API is designed behind a faÃ§ade so the backend can switch.
+
+## Note (2026-11-17, P6 as built)
+OpenSearch 3.8.0 now runs in the `search` profile, at about 1.2 GB with a 512 MB heap. Global search uses it when it runs and falls back to Postgres FTS otherwise, so the `core` profile keeps working without it.

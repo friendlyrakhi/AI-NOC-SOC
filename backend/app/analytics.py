@@ -1,13 +1,19 @@
-"""ClickHouse telemetry store (docs/03 §3, threat model T8).
+"""ClickHouse telemetry and analytics store (docs/03 §3, threat model T8).
 
 Tenant isolation: every table leads its ORDER BY with tenant_id, and the reader user is bound
-by row policies on ``getSetting('SQL_tenant_id')``. A query without that setting fails rather
-than returning other tenants' rows. The app sets it per query via ``reader_query``.
+by row policies on ``getSetting('SQL_tenant_id')``: a comma-separated list of tenant ids (one
+tenant, or the delegated customers of an MSP aggregate view). A query without that setting
+fails rather than returning other tenants' rows; an empty list matches nothing. The app sets it
+per query via ``reader_query``, from the authenticated principal only.
+
+Fact tables (P6) are ReplacingMergeTree projections of Postgres state written by the analytics
+projector; Postgres stays authoritative. Read them with ``FINAL``.
 """
 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
 import clickhouse_connect
@@ -15,7 +21,7 @@ from clickhouse_connect.driver.asyncclient import AsyncClient
 
 from app.config import Settings
 
-TABLES = ("raw_events", "security_events", "metrics", "events")
+TABLES = ("raw_events", "security_events", "metrics", "events", "alert_facts", "incident_facts", "action_facts")
 
 
 def schema(db: str) -> list[str]:
@@ -44,6 +50,30 @@ def schema(db: str) -> list[str]:
             observed_at DateTime64(3, 'UTC')
         ) ENGINE = MergeTree ORDER BY (tenant_id, name, asset_value, observed_at)
           TTL toDateTime(observed_at) + INTERVAL 14 DAY""",
+        f"""CREATE TABLE IF NOT EXISTS {db}.alert_facts (
+            tenant_id UUID, alert_id UUID, domain LowCardinality(String), severity LowCardinality(String),
+            status LowCardinality(String), connector LowCardinality(String), title String, asset String,
+            incident_id Nullable(UUID), first_seen DateTime64(3, 'UTC'), last_seen DateTime64(3, 'UTC'),
+            occurrence_count UInt32, updated_at DateTime64(6, 'UTC'), version UInt64
+        ) ENGINE = ReplacingMergeTree(version) ORDER BY (tenant_id, alert_id)
+          TTL toDateTime(first_seen) + INTERVAL 400 DAY""",
+        f"""CREATE TABLE IF NOT EXISTS {db}.incident_facts (
+            tenant_id UUID, incident_id UUID, number String, title String, domain LowCardinality(String),
+            severity LowCardinality(String), priority LowCardinality(String), status LowCardinality(String),
+            created_by_type LowCardinality(String), detected_at DateTime64(3, 'UTC'),
+            acknowledged_at Nullable(DateTime64(3, 'UTC')), resolved_at Nullable(DateTime64(3, 'UTC')),
+            ack_due_at DateTime64(3, 'UTC'), resolve_due_at DateTime64(3, 'UTC'), merged UInt8,
+            updated_at DateTime64(6, 'UTC'), version UInt64
+        ) ENGINE = ReplacingMergeTree(version) ORDER BY (tenant_id, incident_id)
+          TTL toDateTime(detected_at) + INTERVAL 400 DAY""",
+        f"""CREATE TABLE IF NOT EXISTS {db}.action_facts (
+            tenant_id UUID, request_id UUID, incident_id Nullable(UUID), action_key LowCardinality(String),
+            tier LowCardinality(String), decision LowCardinality(String), status LowCardinality(String),
+            execution_mode LowCardinality(String), requested_by_type LowCardinality(String),
+            created_at DateTime64(3, 'UTC'), executed_at Nullable(DateTime64(3, 'UTC')),
+            updated_at DateTime64(6, 'UTC'), version UInt64
+        ) ENGINE = ReplacingMergeTree(version) ORDER BY (tenant_id, request_id)
+          TTL toDateTime(created_at) + INTERVAL 400 DAY""",
     ]
 
 
@@ -60,9 +90,11 @@ def users_and_policies(db: str, ingest_pw: str, reader_pw: str) -> list[str]:
         f"GRANT SELECT ON {db}.* TO nocsoc_reader",
     ]
     for table in TABLES:
+        # OR REPLACE: P2 created a single-tenant policy; P6 accepts a list (MSP aggregate views).
         stmts.append(
-            f"CREATE ROW POLICY IF NOT EXISTS tenant_isolation ON {db}.{table} FOR SELECT "
-            f"USING tenant_id = toUUID(getSetting('SQL_tenant_id')) TO nocsoc_reader"
+            f"CREATE ROW POLICY OR REPLACE tenant_isolation ON {db}.{table} FOR SELECT "
+            f"USING has(splitByChar(',', toString(getSetting('SQL_tenant_id'))), toString(tenant_id)) "
+            f"TO nocsoc_reader"
         )
     return stmts
 
@@ -89,11 +121,22 @@ async def reader_client(settings: Settings) -> AsyncClient:
     return await _client(settings, "nocsoc_reader", pw)
 
 
+def tenant_setting(tenants: uuid.UUID | Sequence[uuid.UUID] | None) -> str:
+    """The row-policy setting for one tenant or a list. Only ever built from the principal."""
+    if tenants is None:
+        raise ValueError("analytics reads require a tenant")
+    ids = [tenants] if isinstance(tenants, uuid.UUID) else list(tenants)
+    if not ids:
+        raise ValueError("analytics reads require a tenant")
+    return ",".join(str(uuid.UUID(str(t))) for t in ids)
+
+
 async def reader_query(
-    client: AsyncClient, tenant_id: uuid.UUID | None, sql: str, parameters: dict[str, Any]
+    client: AsyncClient,
+    tenant_id: uuid.UUID | Sequence[uuid.UUID] | None,
+    sql: str,
+    parameters: dict[str, Any],
 ) -> list[dict[str, Any]]:
     """Every read carries the tenant setting the row policies require. No tenant, no query."""
-    if tenant_id is None:
-        raise ValueError("analytics reads require a tenant")
-    result = await client.query(sql, parameters=parameters, settings={"SQL_tenant_id": str(tenant_id)})
+    result = await client.query(sql, parameters=parameters, settings={"SQL_tenant_id": tenant_setting(tenant_id)})
     return [dict(zip(result.column_names, row, strict=True)) for row in result.result_rows]

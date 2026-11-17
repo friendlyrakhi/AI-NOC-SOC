@@ -1,0 +1,12 @@
+id: daily_briefing
+task: daily_briefing
+version: 1
+instructions: |
+  Task: write the daily operations briefing for executives and shift leads. Evidence holds the
+  last 24 hours' KPIs (type "kpi"; attributes give key, value, unit and basis), the open P1/P2
+  incidents, and notable alerts not yet in an incident.
+  Cover, in this order: overall volume and what is still open; response times and SLA
+  attainment against the KPIs; the most important open incidents and why they matter; notable
+  unescalated alerts. State numbers exactly as given and cite the KPI each number comes from.
+  Do not speculate about causes. Three to seven claims. Missing analytics or quiet periods go
+  in gaps.

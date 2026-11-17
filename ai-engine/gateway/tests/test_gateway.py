@@ -21,7 +21,7 @@ from ai_gateway.schemas import OUTPUT_JSON_SCHEMA, AiOutput
 from ai_gateway.templates import EVIDENCE_CLOSE, EVIDENCE_OPEN, load_templates
 
 TOKEN = "t" * 40
-TASKS = ["alert_summary", "incident_summary", "triage", "rca", "pir_draft", "query_assist", "chat"]
+TASKS = ["alert_summary", "incident_summary", "triage", "rca", "pir_draft", "query_assist", "chat", "daily_briefing"]
 
 
 def settings(**kw: Any) -> GatewaySettings:

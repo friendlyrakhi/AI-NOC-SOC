@@ -1,115 +1,109 @@
 import Link from "next/link";
 
-import { BarList, SegmentBar, Sparkline, TimeSeriesChart } from "@/components/charts";
+import { TimeSeriesChart, type Slot } from "@/components/charts";
 import { DataTable } from "@/components/data-table";
-import { DemoBadge, DemoNotice, HealthBadge, KpiTile } from "@/components/indicators";
-import { gate, Grid } from "@/components/page-states";
+import { SandboxNotice } from "@/components/indicators";
+import { BriefingCard, KpiGrid, PeriodNav } from "@/components/insights";
+import { gate } from "@/components/page-states";
+import { Tabs } from "@/components/tabs";
 import { Card, PageHeader } from "@/components/ui";
-import { weekDelta } from "@/lib/format";
-import { incidentColumns, incidentRow } from "@/lib/rows";
-import { getDemo } from "@/lib/server/demo";
-import { OPEN_INCIDENT, avgLast, severityParts } from "@/lib/severity";
+import { formatTime } from "@/lib/format";
+import { getMe } from "@/lib/server/api";
+import { getLatestBriefing, getOverview, getSeries, period as toPeriod, toSeries } from "@/lib/server/insights";
 
-export default async function CommandCenter() {
-  const { me, data, aggregate } = await getDemo();
+import { DemoCommandCenter } from "./_demo";
+
+const SEVERITY_SLOT: Record<string, Slot> = { critical: 1, high: 2, medium: 3, low: 4, info: 5 };
+const DOMAIN_SLOT: Record<string, Slot> = { noc: 1, soc: 2, joint: 3 };
+
+export default async function CommandCenter({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const me = await getMe();
   const denied = gate(me, "portal:command", "Executive Command Center");
   if (denied) return denied;
-  const k = data.kpis;
-  const open = data.incidents.filter((i) => OPEN_INCIDENT.has(i.status));
-  const major = open.filter((i) => i.priority === "P1" || i.priority === "P2");
-  const kev = data.vulns.filter((v) => v.kev && v.status !== "fixed");
-  const scope = aggregate ? `${data.tenants.length} customers` : (data.tenants[0]?.name ?? "");
-
-  const perCustomer = data.tenants.map((t) => ({
-    label: t.name,
-    value: open.filter((i) => i.tenant.id === t.id).length,
-    href: "/command/customers",
-  }));
+  if (me.mode === "aggregate") {
+    return (
+      <DemoCommandCenter reason="The figures below are demo data. Real per-customer KPIs for the customers you are delegated to are on the Customers page." />
+    );
+  }
+  const p = toPeriod((await searchParams).period);
+  const [overview, alerts, incidents, briefing] = await Promise.all([
+    getOverview(p),
+    getSeries("alerts", p, "domain"),
+    getSeries("incidents", p, "severity"),
+    me.permissions.includes("analytics:read") ? getLatestBriefing() : Promise.resolve(null),
+  ]);
+  if (!overview) {
+    return <DemoCommandCenter reason="Real KPIs need the analytics store (stream profile) and the analytics:read permission. Showing demo data." />;
+  }
+  const granularity = p === "24h" ? "hour" : "day";
+  const alertSeries = toSeries(alerts ?? [], p).map((s) => ({ ...s, name: s.name.toUpperCase(), slot: DOMAIN_SLOT[s.name] ?? 4 }));
+  const incidentSeries = toSeries(incidents ?? [], p).map((s) => ({ ...s, slot: SEVERITY_SLOT[s.name] ?? 6 }));
 
   return (
     <>
       <PageHeader
         title="Executive Command Center"
-        description={`Cross-domain operations and security posture for ${scope}.`}
-        actions={<DemoBadge />}
+        description={`KPIs computed from this tenant's incidents, alerts and actions (analytics facts, as of ${formatTime(overview.computed_at)}). Select a KPI to see the records behind it.`}
+        actions={<PeriodNav current={p} base="/command" />}
       />
-      <DemoNotice />
-      <Grid cols={6}>
-        <KpiTile label="Mean time to acknowledge" value={Math.round(avgLast(k.mttaMinutes))} unit="min" delta={weekDelta(k.mttaMinutes)} goodWhen="down">
-          <Sparkline points={k.mttaMinutes} />
-        </KpiTile>
-        <KpiTile label="Mean time to resolve" value={(avgLast(k.mttrMinutes) / 60).toFixed(1)} unit="h" delta={weekDelta(k.mttrMinutes)} goodWhen="down">
-          <Sparkline points={k.mttrMinutes} />
-        </KpiTile>
-        <KpiTile label="SLA attainment (7 d)" value={avgLast(k.slaAttainment).toFixed(1)} unit="%" delta={weekDelta(k.slaAttainment)} goodWhen="up">
-          <Sparkline points={k.slaAttainment} />
-        </KpiTile>
-        <KpiTile label="Open P1 / P2 incidents" value={major.length} hint={`${open.length} open in total`} href="/incidents" />
-        <KpiTile label="Known-exploited vulns open" value={kev.length} hint="CISA-KEV style flag (demo)" href="/soc/vulnerabilities" />
-        <KpiTile label="Automation rate" value={avgLast(k.automationRate).toFixed(0)} unit="%" delta={weekDelta(k.automationRate)} goodWhen="up" hint="Simulated actions" />
-      </Grid>
-
+      <SandboxNotice>Figures come from sandbox connector data and demo seed content processed by the real platform, not production systems.</SandboxNotice>
+      <Tabs
+        tabs={(["all", "noc", "soc"] as const).map((d) => ({
+          label: d === "all" ? "All" : d.toUpperCase(),
+          content: <KpiGrid kpis={overview.kpis[d] ?? []} domain={d} period={p} />,
+        }))}
+      />
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <Card title="Alert volume: NOC and SOC (30 days)">
-          <TimeSeriesChart
-            title="Daily alert volume for NOC and SOC over 30 days"
-            series={[
-              { name: "NOC", slot: 1, points: k.nocAlerts },
-              { name: "SOC", slot: 2, points: k.socAlerts },
-            ]}
-          />
-        </Card>
-        <Card title="SLA attainment (30 days)">
-          <TimeSeriesChart title="Daily SLA attainment percentage" series={[{ name: "SLA attainment", slot: 1, points: k.slaAttainment }]} format="percent" yMin={90} yMax={100} />
-        </Card>
-        <Card title="Mean time to acknowledge">
-          <TimeSeriesChart title="Daily mean time to acknowledge in minutes" series={[{ name: "MTTA", slot: 1, points: k.mttaMinutes }]} format="minutes" height={160} />
-        </Card>
-        <Card title="Mean time to resolve">
-          <TimeSeriesChart title="Daily mean time to resolve in minutes" series={[{ name: "MTTR", slot: 1, points: k.mttrMinutes }]} format="minutes" height={160} />
-        </Card>
-      </div>
-
-      <div className="mt-6 grid gap-6 xl:grid-cols-3">
-        <Card title="Open incidents by severity">
-          <SegmentBar label="Open incidents by severity" parts={severityParts(open, ["critical", "high", "medium", "low"])} />
-        </Card>
-        <Card title="Business services">
-          <ul className="space-y-1.5 text-sm">
-            {data.services.slice(0, 8).map((s) => (
-              <li key={s.id} className="flex items-center justify-between gap-2">
-                <span className="truncate">
-                  {s.name}
-                  {aggregate && <span className="text-muted ml-1 text-xs">{s.tenant.name}</span>}
-                </span>
-                <HealthBadge status={s.status} />
-              </li>
-            ))}
-          </ul>
-          <Link href="/noc/sla" className="text-primary mt-3 inline-block text-xs hover:underline">
-            SLA reporting →
-          </Link>
-        </Card>
-        <Card title={aggregate ? "Open incidents by customer" : "Critical vulnerabilities (30 days)"}>
-          {aggregate ? (
-            <BarList label="Open incidents by customer" items={perCustomer} />
+        <Card title="Alerts by domain">
+          {alertSeries.length ? (
+            <TimeSeriesChart title={`Alerts per ${granularity} by domain`} series={alertSeries} granularity={granularity} />
           ) : (
-            <TimeSeriesChart title="Open critical vulnerabilities per day" series={[{ name: "Critical vulnerabilities", slot: 2, points: k.criticalVulns }]} height={150} />
+            <p className="text-muted text-sm">No alerts in this period.</p>
+          )}
+        </Card>
+        <Card title="Incidents by severity">
+          {incidentSeries.length ? (
+            <TimeSeriesChart title={`Incidents opened per ${granularity} by severity`} series={incidentSeries} granularity={granularity} />
+          ) : (
+            <p className="text-muted text-sm">No incidents in this period.</p>
           )}
         </Card>
       </div>
-
-      <section className="mt-6">
-        <h2 className="mb-3 text-sm font-semibold">Major incidents (open P1 and P2)</h2>
-        <DataTable
-          caption="Open P1 and P2 incidents"
-          rows={major.map(incidentRow)}
-          columns={incidentColumns(aggregate)}
-          pageSize={10}
-          initialSort={{ key: "severity", dir: "asc" }}
-          emptyText="No open P1 or P2 incidents."
-        />
-      </section>
+      <div className="mt-6 grid gap-6 xl:grid-cols-3">
+        <section className="xl:col-span-2">
+          <h2 className="mb-3 text-sm font-semibold">Major incidents (open P1 and P2)</h2>
+          <DataTable
+            caption="Open P1 and P2 incidents"
+            rows={overview.open_incidents.map((i) => ({
+              _id: i.id,
+              _href: `/incidents/${i.id}`,
+              number: i.number,
+              title: i.title,
+              priority: i.priority,
+              severity: i.severity,
+              status: i.status,
+              domain: i.domain.toUpperCase(),
+              detected: i.detected_at,
+            }))}
+            columns={[
+              { key: "number", header: "Incident", type: "link" },
+              { key: "title", header: "Title" },
+              { key: "priority", header: "Priority", filter: true },
+              { key: "severity", header: "Severity", type: "severity" },
+              { key: "status", header: "Status", type: "state" },
+              { key: "domain", header: "Domain", filter: true, hideOnMobile: true },
+              { key: "detected", header: "Detected", type: "relative" },
+            ]}
+            emptyText="No open P1 or P2 incidents."
+          />
+          <p className="mt-2 text-xs">
+            <Link href="/reports" className="text-primary hover:underline">
+              Reports and exports →
+            </Link>
+          </p>
+        </section>
+        <BriefingCard run={briefing} canGenerate={me.permissions.includes("ai:use")} />
+      </div>
     </>
   );
 }

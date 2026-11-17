@@ -3,6 +3,7 @@
 import importlib.util
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
 
@@ -87,3 +88,72 @@ def test_isolated_gateway_passes() -> None:
 def test_unsafe_gateway_rejected(services: dict[str, object], networks: dict[str, object], expected: str) -> None:
     problems = check_ai({"services": services, "networks": networks})
     assert any(expected in p for p in problems), problems
+
+
+# ---------------------------------------------------------------- OpenSearch isolation (SEC-ISO-03)
+check_search = _load().check_search_isolation
+
+OS_OK = {
+    "services": {
+        "opensearch": {"networks": {"search": None}, "secrets": [{"source": "opensearch_admin_password"}]},
+        "api": {"networks": {"search": None, "data": None}, "secrets": [{"source": "opensearch_reader_password"}]},
+        "ingest-worker": {"networks": {"search": None}, "secrets": [{"source": "opensearch_indexer_password"}]},
+    },
+    "networks": {"search": {"internal": True}},
+}
+
+
+def test_isolated_search_passes() -> None:
+    assert check_search(OS_OK) == []
+
+
+@pytest.mark.parametrize(
+    ("patch", "expected"),
+    [
+        ({"networks": {"search": {}}}, "must be internal"),
+        ({"services": {"opensearch": {"networks": {"search": None, "data": None}}}}, "only to network 'search'"),
+        ({"services": {"opensearch": {"networks": {"search": None}, "ports": [{"published": "9200"}]}}}, "publish"),
+        ({"services": {"connector-runner": {"networks": {"search": None}}}}, "must not join"),
+        (
+            {"services": {"api": {"networks": {"search": None}, "secrets": [{"source": "opensearch_admin_password"}]}}},
+            "must not hold",
+        ),
+        (
+            {
+                "services": {
+                    "api": {"networks": {"search": None}, "secrets": [{"source": "opensearch_indexer_password"}]}
+                }
+            },
+            "must not hold",
+        ),
+        (
+            {
+                "services": {
+                    "ingest-worker": {
+                        "networks": {"search": None},
+                        "secrets": [{"source": "opensearch_reader_password"}],
+                    }
+                }
+            },
+            "must not hold",
+        ),
+    ],
+)
+def test_unsafe_search_rejected(patch: dict[str, Any], expected: str) -> None:
+    config = {
+        "services": {**OS_OK["services"], **patch.get("services", {})},
+        "networks": patch.get("networks", OS_OK["networks"]),
+    }
+    problems = check_search(config)
+    assert any(expected in p for p in problems), problems
+
+
+def test_connector_runtimes_cannot_reach_opensearch() -> None:
+    config = {
+        "services": {
+            "opensearch": {"networks": {"search": None}},
+            "workflow-worker": {"networks": {"search": None}, "environment": {"NOCSOC_OPENSEARCH_URL": "x"}},
+        }
+    }
+    problems = _load().check_isolation(config)
+    assert any("opensearch" in p for p in problems) and any("OPENSEARCH" in p for p in problems), problems

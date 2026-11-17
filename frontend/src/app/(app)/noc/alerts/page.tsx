@@ -31,7 +31,8 @@ export default async function NocAlertsPage() {
           rows={(ingested?.items ?? []).map(pipelineAlertRow)}
           columns={[...alertColumns(false), { key: "incident", header: "Incident", type: "mono", hideOnMobile: true }]}
           searchPlaceholder="Search alert, asset, service…"
-          exportName="noc-alerts-sandbox"
+          exportName="noc-alerts"
+          dataSource="sandbox"
           emptyText={
             ingested
               ? "No NOC alerts ingested yet. Add a sandbox integration or replay a scenario under Connectors."
