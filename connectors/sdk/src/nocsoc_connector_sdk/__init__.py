@@ -38,6 +38,7 @@ from nocsoc_connector_sdk.models import (
     VulnFindingV1,
 )
 from nocsoc_connector_sdk.sandbox import GridStream, Simulator, World, iso, parse_ts, seeded
+from nocsoc_connector_sdk.transport import LiveHttp, check_egress
 
 __version__ = "1.1.0"
 
@@ -61,6 +62,7 @@ __all__ = [
     "FetchBudget",
     "FetchResult",
     "GridStream",
+    "LiveHttp",
     "Manifest",
     "MetricPointV1",
     "NormalizedRecord",
@@ -78,6 +80,7 @@ __all__ = [
     "VulnFindingV1",
     "World",
     "assert_execution_allowed",
+    "check_egress",
     "dig",
     "iso",
     "load_manifest",

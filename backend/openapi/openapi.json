@@ -1892,6 +1892,11 @@
             "title": "Id",
             "type": "string"
           },
+          "live_read": {
+            "default": false,
+            "title": "Live Read",
+            "type": "boolean"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -3656,6 +3661,15 @@
             "title": "Definition Id",
             "type": "string"
           },
+          "mode": {
+            "default": "sandbox",
+            "enum": [
+              "sandbox",
+              "live"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
           "name": {
             "maxLength": 100,
             "minLength": 1,
@@ -3736,7 +3750,10 @@
             "title": "Last Success At"
           },
           "mode": {
-            "const": "sandbox",
+            "enum": [
+              "sandbox",
+              "live"
+            ],
             "title": "Mode",
             "type": "string"
           },
@@ -3891,7 +3908,10 @@
             "title": "Last Success At"
           },
           "mode": {
-            "const": "sandbox",
+            "enum": [
+              "sandbox",
+              "live"
+            ],
             "title": "Mode",
             "type": "string"
           },
@@ -7929,7 +7949,10 @@
             "type": "object"
           },
           "mode": {
-            "const": "sandbox",
+            "enum": [
+              "sandbox",
+              "live"
+            ],
             "title": "Mode",
             "type": "string"
           },

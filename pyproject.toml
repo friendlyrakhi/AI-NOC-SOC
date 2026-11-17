@@ -82,6 +82,7 @@ known-first-party = ["app", "nocsoc_connector_sdk", "nocsoc_connectors", "connec
 "scripts/backup.py" = ["S608"]
 # Embedded SQL and the in-container probe script.
 "scripts/verify_hardened.py" = ["E501", "S603", "S607"]
+"scripts/verify_live.py" = ["E501", "S603", "S607", "S608"]
 # Vendor-shaped sandbox payload literals read best on one line each.
 "connectors/catalog/src/nocsoc_connectors/**" = ["E501"]
 

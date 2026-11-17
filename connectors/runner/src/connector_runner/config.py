@@ -23,3 +23,7 @@ class RunnerSettings(BaseSettings):
     poll_seconds: float = Field(default=5.0, ge=0.5, le=300)
     max_pages_per_run: int = Field(default=10, ge=1, le=100)
     concurrency: int = Field(default=8, ge=1, le=64)
+    # P8 (ADR-0019): the runner's own switch for live reads (defence in depth with the API's), and
+    # the operator allow-list of private (on-premises) vendor hosts, comma-separated.
+    live_read_enabled: bool = False
+    egress_private_allowlist: str = ""

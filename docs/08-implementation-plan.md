@@ -193,9 +193,13 @@ Deliverables:
 
 ## P8 — Live connector verification (GATED — requires separate approval)
 
-Not started without explicit sign-off. Scope when approved:
+**Approved 2026-11-17; in progress.** Design: ADR-0019. Progress: `docs/reports/P8-progress.md`. Per-vendor hand-over: `docs/operations/p8-vendor-onboarding.md`.
+
+Done: Shamir unseal (operator-held shares, root token revoked), the live-read gate (platform switch, vault, connector support, step-up, audit, runner re-check), egress control (`LiveHttp`: private allow-list, no redirects, no credentials over http), and **Prometheus/Alertmanager live-verified** against the real software.
+
+Original scope:
 - You provide vendor trial/sandbox credentials. Read-only scopes first.
-- Per connector: implement or adjust `HttpTransport`, run against the real endpoint, record `VERIFICATION.md`, promote to `live-verified`.
+- Per connector: implement or adjust `HttpTransport`, run against the real endpoint, record `connectors/catalog/verification/<id>.md`, promote to `live-verified`.
 - Production secrets provider (OpenBao/KMS) is **mandatory** before any real credential is stored.
 - Live **actions** remain disabled; enabling any single live action requires its own design review, approval, and a rollback plan.
 

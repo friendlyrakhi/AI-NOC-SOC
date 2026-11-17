@@ -10,6 +10,7 @@ from nocsoc_connector_sdk import (
     AlertV1,
     AuthError,
     Checkpoint,
+    Connector,
     ConnectorContext,
     ExecutionDisabledError,
     RateLimitedError,
@@ -38,7 +39,21 @@ def test_catalog_has_all_targets() -> None:
         "itsm",
         "generic",
     }
-    assert all(c.manifest.certification == "sandbox" for c in REGISTRY.values())
+
+
+def test_certification_follows_adr_0019() -> None:
+    """Only connectors with a real live-read implementation may leave 'sandbox'; 'live-verified'
+    needs a recorded verification run (connectors/catalog/verification/<id>.md)."""
+    from pathlib import Path
+
+    records = Path(__file__).resolve().parents[1] / "verification"
+    for cid, cls in REGISTRY.items():
+        m = cls.manifest
+        if m.certification != "sandbox":
+            assert m.live_read, f"{cid}: certification {m.certification} without live_read"
+            assert cls.fetch_live is not Connector.fetch_live, f"{cid}: live_read without fetch_live"
+        if m.certification == "live-verified":
+            assert (records / f"{cid}.md").exists(), f"{cid}: live-verified without a verification record"
 
 
 @pytest.mark.parametrize("connector_id", sorted(REGISTRY))

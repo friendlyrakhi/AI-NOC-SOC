@@ -75,6 +75,8 @@ class DefinitionOut(BaseModel):
     secrets_schema: dict[str, Any]
     scenarios: list[str]
     docs_reference: str
+    # P8 (ADR-0019): the connector can read the vendor's real API (live instances).
+    live_read: bool = False
 
 
 def _definition_out(cid: str) -> DefinitionOut:
@@ -94,6 +96,7 @@ def _definition_out(cid: str) -> DefinitionOut:
         secrets_schema=m.secrets_schema,
         scenarios=[s.key for s in SCENARIOS.values() if m.id in s.connectors],
         docs_reference=m.docs_reference,
+        live_read=m.live_read,
     )
 
 
@@ -110,7 +113,7 @@ class InstanceOut(BaseModel):
     id: UUID
     definition_id: str
     name: str
-    mode: Literal["sandbox"]
+    mode: Literal["sandbox", "live"]
     config: dict[str, Any]
     enabled: bool
     status: InstanceStatus
@@ -135,6 +138,8 @@ class InstanceCreate(BaseModel):
     definition_id: str = Field(max_length=64)
     name: str = Field(min_length=1, max_length=100)
     config: dict[str, Any] = Field(default_factory=dict)
+    # P8 (ADR-0019): "live" reads the real vendor API (never writes). Gated; see live_read_gate().
+    mode: Literal["sandbox", "live"] = "sandbox"
 
 
 class InstancePatch(BaseModel):
@@ -193,12 +198,38 @@ async def list_instances(services: Svc, p: P) -> list[InstanceOut]:
         return [InstanceOut(**r._mapping) for r in rows]
 
 
+def live_read_gate(services: Services, p: Principal, cls: Any) -> None:
+    """Every condition of ADR-0019 for a live (read-only) instance; each is a separate layer."""
+    s = services.settings
+    if not s.live_read_enabled:
+        raise ProblemError(
+            409, "connector.live_disabled", "Live connectors are off", "The platform does not allow live reads."
+        )
+    if s.secrets_provider != "openbao" or s.openbao_unseal != "shamir":
+        raise ProblemError(
+            409,
+            "connector.live_needs_vault",
+            "Production secrets provider required",
+            "Live connectors need OpenBao with operator-held unseal shares (hardened profile).",
+        )
+    if not cls.manifest.live_read:
+        raise ProblemError(
+            422, "connector.live_unsupported", "No live support", f"{cls.manifest.id} supports sandbox mode only."
+        )
+    if not p.stepped_up(s.step_up_minutes):
+        raise ProblemError(
+            403, "auth.step_up_required", "Re-authentication required", "Confirm with your authenticator code."
+        )
+
+
 @router.post(
     "/instances", response_model=InstanceCreated, status_code=status.HTTP_201_CREATED, **requires("connector:manage")
 )
 async def create_instance(body: InstanceCreate, services: Svc, p: P) -> InstanceCreated:
     cls = definition(body.definition_id)
     _check_config(body.definition_id, body.config)
+    if body.mode == "live":
+        live_read_gate(services, p, cls)
     instance_id = uuid4()
     webhook_plain = new_webhook_secret() if cls.manifest.webhook else None
     async with tenant_tx(services, p) as conn:
@@ -217,8 +248,8 @@ async def create_instance(body: InstanceCreate, services: Svc, p: P) -> Instance
             await conn.execute(
                 text(
                     "INSERT INTO connector_instances "
-                    "(id, tenant_id, definition_id, name, config, webhook_secret_id, created_by) "
-                    "VALUES (:id, app_tenant(), :d, :n, CAST(:c AS jsonb), :w, :u)"
+                    "(id, tenant_id, definition_id, name, config, webhook_secret_id, created_by, mode) "
+                    "VALUES (:id, app_tenant(), :d, :n, CAST(:c AS jsonb), :w, :u, :mode)"
                 ),
                 {
                     "id": instance_id,
@@ -227,6 +258,7 @@ async def create_instance(body: InstanceCreate, services: Svc, p: P) -> Instance
                     "c": json.dumps(body.config),
                     "w": webhook_secret_id,
                     "u": p.user_id,
+                    "mode": body.mode,
                 },
             )
         except IntegrityError as exc:
@@ -240,7 +272,7 @@ async def create_instance(body: InstanceCreate, services: Svc, p: P) -> Instance
             "connector.create",
             target_type="connector_instance",
             target_id=instance_id,
-            details={"definition_id": body.definition_id, "name": body.name, "mode": "sandbox"},
+            details={"definition_id": body.definition_id, "name": body.name, "mode": body.mode},
         )
     return InstanceCreated(**row._mapping, webhook_secret=webhook_plain)
 
@@ -422,6 +454,15 @@ async def test_instance(instance_id: UUID, services: Svc, p: P) -> ConnectionTes
     """Runs the connector's connection test against its sandbox simulator."""
     async with tenant_tx(services, p) as conn:
         current = await _get(conn, instance_id)
+    if current.mode != "sandbox":
+        # The API has no route to vendors; live instances are tested by the runner's first pull.
+        raise ProblemError(
+            409,
+            "connector.live_test_via_runner",
+            "Tested by the runner",
+            "Live connections are checked by the connector runner; see the integration's health.",
+        )
+    async with tenant_tx(services, p) as conn:
         ciphertext = (
             await conn.execute(
                 text(

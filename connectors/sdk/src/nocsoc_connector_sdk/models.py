@@ -44,6 +44,8 @@ class Manifest(_Model):
     version: str
     sdk: str
     certification: Literal["sandbox", "contract-tested", "live-verified"] = "sandbox"
+    # P8 (ADR-0019): implements ``fetch_live`` against the vendor's real API (read-only).
+    live_read: bool = False
     auth_types: list[str] = Field(default_factory=list)
     streams: list[StreamSpec] = Field(default_factory=list)
     webhook: bool = False

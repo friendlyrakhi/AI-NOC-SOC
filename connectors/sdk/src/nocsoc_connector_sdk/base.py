@@ -28,7 +28,7 @@ from nocsoc_connector_sdk.models import (
     RawRecord,
 )
 from nocsoc_connector_sdk.sandbox import Simulator, iso, parse_ts
-from nocsoc_connector_sdk.transport import FaultConfig, SandboxTransport, Transport
+from nocsoc_connector_sdk.transport import FaultConfig, LiveHttp, SandboxTransport, Transport
 
 DEFAULT_BACKFILL = timedelta(hours=1)
 
@@ -80,6 +80,16 @@ class _State:
     faults: FaultConfig = field(default_factory=FaultConfig)
 
 
+class _NoTransport:
+    """Live connectors read through LiveHttp; the sandbox transport interface is closed."""
+
+    async def get_json(self, path: str, params: dict[str, Any] | None = None) -> Any:
+        raise ConfigError("live connectors use LiveHttp")
+
+    async def post_json(self, path: str, body: dict[str, Any]) -> Any:
+        raise ConfigError("live connectors cannot write (live actions are disabled)")
+
+
 class Connector(ABC):
     manifest: ClassVar[Manifest]
     streams: ClassVar[dict[str, Paged]] = {}
@@ -91,10 +101,20 @@ class Connector(ABC):
         config: dict[str, Any] | None = None,
         secrets: dict[str, str] | None = None,
         transport: Transport | None = None,
+        http: LiveHttp | None = None,
     ) -> None:
         self.ctx = ctx
         self.config = dict(config or {})
         self._secrets = dict(secrets or {})
+        self.http = http
+        if ctx.mode == "live":
+            # P8 (ADR-0019): live reads only, through the runner's egress-checked LiveHttp.
+            if not self.manifest.live_read:
+                raise ConfigError(f"{self.manifest.id} does not support live reads")
+            if http is None:
+                raise ConfigError("live mode requires the runner's live HTTP client")
+            self.transport = transport or _NoTransport()
+            return
         if transport is None:
             if ctx.mode != "sandbox":
                 raise ConfigError("live mode requires a transport supplied by the runner")
@@ -126,6 +146,8 @@ class Connector(ABC):
 
     # ------------------------------------------------------------- pull
     async def fetch(self, stream: str, checkpoint: Checkpoint | None, budget: FetchBudget | None = None) -> FetchResult:
+        if self.ctx.mode == "live":
+            return await self.fetch_live(stream, checkpoint, budget or FetchBudget())
         spec = self.streams[stream]
         budget = budget or FetchBudget()
         now = self.ctx.clock()
@@ -166,6 +188,31 @@ class Connector(ABC):
         except (KeyError, ValueError, TypeError):
             observed = now
         return RawRecord(source_id=str(source_id), observed_at=observed, schema=spec.schema, payload=item)
+
+    async def fetch_live(self, stream: str, checkpoint: Checkpoint | None, budget: FetchBudget) -> FetchResult:
+        """Live read against the vendor's real API (P8). Connectors with ``live_read: true`` override
+        this; the base refuses."""
+        raise ConfigError(f"{self.manifest.id} does not support live reads")
+
+    @classmethod
+    def live_headers(cls, secrets: dict[str, str]) -> dict[str, str]:
+        """Authentication headers for live reads. Default: ``bearer_token`` or ``api_token`` as a
+        bearer token, or ``username``/``password`` as HTTP Basic. Connectors override for vendor schemes."""
+        import base64
+
+        token = secrets.get("bearer_token") or secrets.get("api_token")
+        if token:
+            return {"Authorization": f"Bearer {token}"}
+        if secrets.get("username") and secrets.get("password"):
+            basic = base64.b64encode(f"{secrets['username']}:{secrets['password']}".encode()).decode()
+            return {"Authorization": f"Basic {basic}"}
+        return {}
+
+    def live_url(self, key: str) -> str:
+        url = str(self.config.get(key) or "")
+        if not url:
+            raise ConfigError(f"live mode needs '{key}' in the configuration")
+        return url
 
     # ------------------------------------------------------------- normalize (pure)
     @staticmethod

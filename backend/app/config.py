@@ -89,6 +89,9 @@ class Settings(BaseSettings):
     temporal_namespace: str = "default"
     workflow_token: SecretStr | None = None
     approval_expiry_minutes: int = Field(default=30, ge=1, le=1440)
+    # P8 (ADR-0019): live-read connector instances. Off unless set in the environment; also needs
+    # OpenBao with Shamir unseal. The API cannot change it.
+    live_read_enabled: bool = False
     # Shared token the connector-runner presents on internal endpoints.
     runner_token: SecretStr | None = None
     webhook_max_bytes: int = Field(default=1_048_576, ge=1024, le=10_485_760)
@@ -101,6 +104,8 @@ class Settings(BaseSettings):
     openbao_url: str | None = None
     openbao_approle_dir: str = "/run/openbao"
     openbao_transit_key: str = "nocsoc-master"
+    # "auto" = dev-grade (unseal key in a volume); "shamir" = operator-held shares (ADR-0019, P8).
+    openbao_unseal: Literal["auto", "shamir"] = "auto"
     # CA bundle for TLS between services (hardened profile); None = plain connections (dev).
     tls_ca_file: str | None = None
 

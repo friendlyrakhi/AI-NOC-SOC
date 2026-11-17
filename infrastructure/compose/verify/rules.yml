@@ -1,0 +1,15 @@
+# Verification alerts: one always fires, one fires when a scrape target is down (none should be).
+groups:
+  - name: nocsoc-verification
+    rules:
+      - alert: VerificationAlwaysFiring
+        expr: vector(1)
+        labels: {severity: warning, instance: "prometheus-demo:9090"}
+        annotations:
+          summary: Always-firing alert for the NOC/SOC live-read verification
+          description: Real Prometheus rule, evaluated by a real Prometheus and delivered to a real Alertmanager.
+      - alert: TargetDown
+        expr: up == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "Scrape target {{ $labels.instance }} is down"}

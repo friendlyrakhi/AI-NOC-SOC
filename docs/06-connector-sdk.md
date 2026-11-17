@@ -136,7 +136,7 @@ Key types:
 |-------|--------------|---------------|
 | `sandbox` | Manifest valid; ContractSuite passes against `SandboxTransport`; golden normalization tests; simulate implementations for all actions | sandbox |
 | `contract-tested` | + `HttpTransport` implemented against public API docs; recorded/replayed HTTP contract tests (VCR-style cassettes built from **documented** example responses); SSRF/timeouts verified | sandbox |
-| `live-verified` | + Successfully run against a real vendor tenant/trial **using credentials you provide**, read-only streams first; evidence recorded in `connectors/catalog/<id>/VERIFICATION.md` (date, API version, scopes, what was tested) | sandbox, live (read). Live **actions** need a separate approval per action. |
+| `live-verified` | + Successfully run against a real vendor tenant/trial **using credentials you provide**, read-only streams first; manifest `live_read: true` with a `fetch_live` over `LiveHttp` (ADR-0019); evidence recorded in `connectors/catalog/verification/<id>.md` (date, API version, scopes, what was tested; enforced by `test_certification_follows_adr_0019`) | sandbox, live (read). Live **actions** need a separate approval per action. |
 
 ## 8. Connector catalog (initial targets)
 

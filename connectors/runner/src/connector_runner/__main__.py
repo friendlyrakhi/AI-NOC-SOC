@@ -29,7 +29,15 @@ async def main() -> None:
             if attempt == 29:
                 raise
             await asyncio.sleep(2)
-    scheduler = Scheduler(api, bus, max_pages=settings.max_pages_per_run, concurrency=settings.concurrency)
+    allowlist = frozenset(h.strip().lower() for h in settings.egress_private_allowlist.split(",") if h.strip())
+    scheduler = Scheduler(
+        api,
+        bus,
+        max_pages=settings.max_pages_per_run,
+        concurrency=settings.concurrency,
+        live_read_enabled=settings.live_read_enabled,
+        private_allowlist=allowlist,
+    )
     stopping = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):

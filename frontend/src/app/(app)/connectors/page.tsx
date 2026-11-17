@@ -3,7 +3,7 @@ import { DataTable, type Row } from "@/components/data-table";
 import { KpiTile, SandboxBadge, SandboxNotice, SectionTitle } from "@/components/indicators";
 import { gate, Grid } from "@/components/page-states";
 import { Card, Field, PageHeader } from "@/components/ui";
-import { createInstance, replayScenario } from "@/app/actions/connectors";
+import { createInstance, createLiveInstance, replayScenario } from "@/app/actions/connectors";
 import { CATEGORY_LABEL, type ConnectorCategory } from "@/lib/connectors";
 import { instanceColumns, instanceRow } from "@/lib/pipeline-rows";
 import { getMe } from "@/lib/server/api";
@@ -63,8 +63,8 @@ export default async function ConnectorsPage() {
         actions={<SandboxBadge />}
       />
       <SandboxNotice>
-        Every connector runs in <strong>sandbox mode</strong> against a vendor simulator: the platform really fetches, normalizes,
-        de-duplicates and stores the data, but no live system is contacted and response actions are simulated.
+        Connectors run in <strong>sandbox mode</strong> against a vendor simulator unless an operator has enabled{" "}
+        <strong>live reads</strong> (P8, hardened profile). Live instances only read; response actions are always simulated.
       </SandboxNotice>
       <Grid cols={4}>
         <KpiTile label="Configured instances" value={instances.length} hint={`${definitions.length} connectors in catalog`} />
@@ -99,6 +99,40 @@ export default async function ConnectorsPage() {
               </Field>
               <Field label="Name" hint="Unique within this tenant, e.g. “Prod Datadog”.">
                 <input name="name" required maxLength={100} className="input mt-1 w-full" />
+              </Field>
+            </ActionForm>
+          </Card>
+        )}
+
+        {canManage && definitions.some((d) => d.live_read) && (
+          <Card title="Add live integration (read-only)">
+            <p className="text-muted mb-3 text-xs">
+              Reads the vendor&apos;s real API; it never writes, and response actions stay simulated. Needs the hardened profile with
+              operator-held unseal shares and the live-read switch (docs/operations/p8-vendor-onboarding.md). Add credentials on the
+              integration&apos;s page afterwards.
+            </p>
+            <ActionForm action={createLiveInstance} submitLabel="Add live (read-only)" stepUp resetOnSuccess>
+              <Field label="Connector">
+                <select name="definition_id" required className="input mt-1 w-full">
+                  {definitions
+                    .filter((d) => d.live_read)
+                    .map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.certification})
+                      </option>
+                    ))}
+                </select>
+              </Field>
+              <Field label="Name">
+                <input name="name" required maxLength={100} className="input mt-1 w-full" />
+              </Field>
+              <Field label="Configuration (JSON)" hint="Vendor URLs and options from the connector's configuration schema.">
+                <textarea
+                  name="config"
+                  rows={3}
+                  className="input mt-1 w-full font-mono text-xs"
+                  placeholder={'{"alertmanager_url": "https://alertmanager.example.com", "prometheus_url": "https://prometheus.example.com"}'}
+                />
               </Field>
             </ActionForm>
           </Card>

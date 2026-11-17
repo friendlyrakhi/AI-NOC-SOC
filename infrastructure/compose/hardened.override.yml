@@ -24,6 +24,8 @@ x-tls-client: &tls-client
 x-openbao-client: &openbao-client
   NOCSOC_SECRETS_PROVIDER: openbao
   NOCSOC_OPENBAO_URL: https://openbao:8200
+  # P8 (ADR-0019): "shamir" = shares held by the operator (scripts/openbao.ps1); required for live connectors.
+  NOCSOC_OPENBAO_UNSEAL: ${NOCSOC_OPENBAO_UNSEAL:-auto}
 
 services:
   postgres:
@@ -121,6 +123,7 @@ services:
     environment:
       NOCSOC_OPENBAO_URL: https://openbao:8200
       NOCSOC_TLS_CA_FILE: /run/secrets/tls_ca
+      NOCSOC_OPENBAO_UNSEAL: ${NOCSOC_OPENBAO_UNSEAL:-auto}
     secrets: [tls_ca]
     volumes:
       - baoinit:/var/lib/openbao-init

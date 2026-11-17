@@ -156,6 +156,8 @@ services:
       NOCSOC_OIDC_ISSUER: http://127.0.0.1:${NOCSOC_KEYCLOAK_PORT:-8180}/realms/nocsoc
       NOCSOC_OIDC_DISCOVERY_URL: http://keycloak:8080/realms/nocsoc/.well-known/openid-configuration
       NOCSOC_OIDC_IDP_ENFORCES_MFA: "true"
+      # P8 (ADR-0019): live-read instances; also needs the hardened profile with Shamir unseal.
+      NOCSOC_LIVE_READ_ENABLED: ${NOCSOC_LIVE_READ_ENABLED:-false}
       # Observability profile (P7): OTLP to otel-lgtm when NOCSOC_OTEL_ENABLED=true (scripts/dev sets it).
       NOCSOC_OTEL_ENABLED: ${NOCSOC_OTEL_ENABLED:-false}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
@@ -317,6 +319,35 @@ services:
       retries: 30
       start_period: 30s
     mem_limit: 1g
+
+  # P8 live-read verification targets (ADR-0019): the real open-source Prometheus and Alertmanager,
+  # on the internal `vendors` network that only the connector runner joins. Not platform services.
+  prometheus-demo:
+    <<: *hardening
+    profiles: [verify]
+    networks: [vendors]
+    image: prom/prometheus@sha256:49214755b6153f90a597adcbff0252cc61069f8ab69ce8411285cd4a560e8038  # v3.7.3
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus"]
+    volumes:
+      - ./verify/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./verify/rules.yml:/etc/prometheus/rules.yml:ro
+    read_only: true
+    tmpfs: ["/prometheus:uid=65534,gid=65534"]
+    cap_drop: [ALL]
+    mem_limit: 256m
+
+  alertmanager-demo:
+    <<: *hardening
+    profiles: [verify]
+    networks: [vendors]
+    image: prom/alertmanager@sha256:88743b63b3e09ea6e31e140ced5bf45f4a8e82c617c2a963f78841f4995ad1d7  # v0.29.0
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml", "--storage.path=/alertmanager"]
+    volumes:
+      - ./verify/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    read_only: true
+    tmpfs: ["/alertmanager:uid=65534,gid=65534"]
+    cap_drop: [ALL]
+    mem_limit: 128m
 
   ai-gateway:
     <<: *hardening
@@ -606,7 +637,9 @@ services:
   connector-runner:
     <<: *hardening
     profiles: [stream]
-    networks: [bus]
+    # `vendors`: P8 verification targets and, in an installation, on-premises tools. Live reads need
+    # NOCSOC_LIVE_READ_ENABLED here and in the API, and private hosts need the operator allow-list.
+    networks: [bus, vendors]
     build:
       context: ../..
       dockerfile: infrastructure/docker/runner.Dockerfile
@@ -615,6 +648,8 @@ services:
     environment:
       NOCSOC_API_URL: http://api:8000
       NOCSOC_KAFKA_BOOTSTRAP: redpanda:9092
+      NOCSOC_LIVE_READ_ENABLED: ${NOCSOC_LIVE_READ_ENABLED:-false}
+      NOCSOC_EGRESS_PRIVATE_ALLOWLIST: ${NOCSOC_EGRESS_PRIVATE_ALLOWLIST:-}
     # Only the runner token: no database or ClickHouse credentials (sandbox connectors only).
     secrets:
       - source: runner_token
@@ -688,6 +723,9 @@ networks:
     internal: true
   # OpenSearch, its setup job, the API (reader) and the ingest worker (indexer).
   search:
+    internal: true
+  # P8: vendor systems reachable by the connector runner only (verification targets). No internet.
+  vendors:
     internal: true
   # OTLP from the platform services to otel-lgtm (observability profile). No internet.
   telemetry:

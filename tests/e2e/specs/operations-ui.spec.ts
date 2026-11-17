@@ -145,7 +145,11 @@ test.describe("Administration and shared areas", () => {
     await page.goto("/connectors");
     const catalog = page.getByRole("table", { name: "Connector catalog" });
     await expect(catalog.getByRole("row")).toHaveCount(17); // header + 16 connectors
-    await expect(catalog).not.toContainText(/live-verified|Connected|Online/);
+    await expect(catalog).not.toContainText(/Connected|Online/);
+    // ADR-0019: only connectors with a recorded real-vendor run (connectors/catalog/verification/) are live-verified.
+    const liveVerified = catalog.getByRole("row").filter({ hasText: "live-verified" });
+    await expect(liveVerified).toHaveCount(1);
+    await expect(liveVerified).toContainText("Prometheus / Alertmanager");
     await expect(page.getByText("SANDBOX").first()).toBeVisible();
 
     // Add a webhook-only integration: the secret is shown once, and the status is honest.

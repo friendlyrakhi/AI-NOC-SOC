@@ -209,3 +209,42 @@ def test_token_bucket() -> None:
     b = TokenBucket(per_minute=2, updated=0.0)
     assert b.take(0.0) and b.take(0.0) and not b.take(0.0)
     assert b.take(30.0)  # one token refills in 30 s at 2/min
+
+
+# ---------------------------------------------------------------- P8 live reads (ADR-0019)
+def live_item() -> dict[str, Any]:
+    return item(
+        mode="live",
+        config={"alertmanager_url": "https://am.example.com", "prometheus_url": "https://prom.example.com"},
+    )
+
+
+def test_live_instance_is_refused_unless_the_runner_allows_live_reads() -> None:
+    api, bus = FakeApi([live_item()]), MemoryBus()
+    run(Scheduler(api, bus).tick())
+    assert bus.messages == []
+    assert all(b["status"] != "ok" for _, b in api.reports)
+
+
+def test_live_instance_reads_the_real_api_and_publishes() -> None:
+    import httpx
+
+    def vendor(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/v2/alerts":
+            return httpx.Response(200, json=[{
+                "fingerprint": "aa11", "startsAt": "2026-11-17T11:00:00Z", "status": {"state": "active"},
+                "labels": {"alertname": "TargetDown", "instance": "db-01:9100", "severity": "critical"},
+                "annotations": {"summary": "Scrape target db-01 is down"},
+            }])  # fmt: skip
+        return httpx.Response(200, json={"status": "success", "data": {"result": []}})
+
+    async def public(host: str) -> list[str]:
+        return ["93.184.216.34"]
+
+    api, bus = FakeApi([live_item()]), MemoryBus()
+    sched = Scheduler(
+        api, bus, live_read_enabled=True, live_transport=httpx.MockTransport(vendor), live_resolver=public
+    )
+    run(sched.tick())
+    alerts = [json.loads(v) for topic, _, v in bus.messages if topic == raw_topic("prometheus")]
+    assert alerts and alerts[0]["data"]["payload"]["fingerprint"] == "aa11"

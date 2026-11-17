@@ -247,12 +247,15 @@ def test_worker_has_no_access_outside_ingestion(env: Env, table: str) -> None:
         c.execute(f"SELECT 1 FROM {table} LIMIT 1")
 
 
-def test_connector_mode_is_sandbox_only(env: Env) -> None:
-    """Guardrail #1 holds at the schema level, whatever the API does."""
+@pytest.mark.parametrize("mode", ["write", "action", "LIVE"])
+def test_connector_mode_is_sandbox_or_live_read_only(env: Env, mode: str) -> None:
+    """Schema level (ADR-0019): only 'sandbox' and the read-only 'live' exist. Whether a live
+    instance may be created is enforced by the API gate and re-checked by the runner."""
     with app_conn(env, "globex") as c, pytest.raises(errors.CheckViolation):
         c.execute(
             "INSERT INTO connector_instances (tenant_id, definition_id, name, mode) "
-            "VALUES (app_tenant(), 'splunk', 'live?', 'live')"
+            "VALUES (app_tenant(), 'splunk', 'other mode', %s)",
+            (mode,),
         )
 
 

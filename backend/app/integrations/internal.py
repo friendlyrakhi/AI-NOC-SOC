@@ -46,7 +46,7 @@ class WorkItem(BaseModel):
     instance_id: UUID
     tenant_id: UUID
     definition_id: str
-    mode: Literal["sandbox"]
+    mode: Literal["sandbox", "live"]
     config: dict[str, Any]
     sync_requested_at: datetime | None
     checkpoints: dict[str, Any]
@@ -74,7 +74,11 @@ class RunReport(BaseModel):
 async def runner_work(services: Svc) -> list[WorkItem]:
     async with services.app_db.engine.begin() as conn:
         rows = await conn.execute(text("SELECT * FROM runner_work()"))
-        return [WorkItem(**r._mapping) for r in rows]
+        items = [WorkItem(**r._mapping) for r in rows]
+    # ADR-0019: with live reads switched off, live instances are not handed out at all.
+    if not services.settings.live_read_enabled:
+        items = [i for i in items if i.mode == "sandbox"]
+    return items
 
 
 @router.get("/internal/runner/instances/{instance_id}/credentials", response_model=RunnerCredentials, **internal())

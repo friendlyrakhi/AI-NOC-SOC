@@ -1,0 +1,3 @@
+# P8 live verification target: real Alertmanager 0.29 with a no-op receiver.
+route: {receiver: none, group_wait: 5s, group_interval: 30s, repeat_interval: 1h}
+receivers: [{name: none}]

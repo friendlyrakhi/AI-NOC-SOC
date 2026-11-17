@@ -10,7 +10,11 @@ from nocsoc_connector_sdk import (
     AlertV1,
     AssetRef,
     AssetV1,
+    Checkpoint,
+    ConfigError,
     Connector,
+    FetchBudget,
+    FetchResult,
     GridStream,
     MetricPointV1,
     NormalizedRecord,
@@ -18,6 +22,7 @@ from nocsoc_connector_sdk import (
     RawRecord,
     SchemaDriftError,
     Simulator,
+    iso,
     load_manifest,
     parse_ts,
 )
@@ -485,6 +490,52 @@ class Prometheus(Connector):
                 )
             ]
         return _normalize_am(p, record.observed_at, "prometheus", Prometheus.manifest.severity_map)
+
+    async def fetch_live(self, stream: str, checkpoint: Checkpoint | None, budget: FetchBudget) -> FetchResult:
+        """Real APIs (P8, ADR-0019), read-only:
+        - alerts: Alertmanager ``GET /api/v2/alerts`` (active, not silenced or inhibited). It returns a
+          JSON array of alert objects; the same shape the simulator produces. Pulls are idempotent:
+          the ingest ledger keys pulled records by fingerprint and start time.
+        - metrics: Prometheus ``GET /api/v1/query`` (instant vector, default query ``up``). Each series
+          becomes one sample: ``{"metric": labels, "ts": seconds, "value": float}``.
+        """
+        if self.http is None:
+            raise ConfigError("live mode requires the runner's live HTTP client")
+        now = self.ctx.clock()
+        records: list[RawRecord] = []
+        if stream == "alerts":
+            data = await self.http.get_json(
+                self.live_url("alertmanager_url"),
+                "/api/v2/alerts",
+                {"active": "true", "silenced": "false", "inhibited": "false"},
+            )
+            if not isinstance(data, list):
+                raise SchemaDriftError("alertmanager /api/v2/alerts: expected a JSON array")
+            records = [self._raw(self.streams["alerts"], item, now) for item in data[: budget.max_records]]
+        elif stream == "metrics":
+            query = str(self.config.get("metrics_query") or "up")
+            data = await self.http.get_json(self.live_url("prometheus_url"), "/api/v1/query", {"query": query})
+            if not isinstance(data, dict) or data.get("status") != "success":
+                raise SchemaDriftError("prometheus /api/v1/query: unexpected response")
+            result = (data.get("data") or {}).get("result")
+            if not isinstance(result, list):
+                raise SchemaDriftError("prometheus /api/v1/query: missing data.result")
+            for series in result[: budget.max_records]:
+                try:
+                    ts, value = series["value"]
+                    labels = dict(series.get("metric") or {})
+                    item = {
+                        "id": f"{stable_int(*sorted(labels.items()), mod=16**12):012x}-{int(float(ts))}",
+                        "metric": labels,
+                        "ts": int(float(ts)),
+                        "value": float(value),
+                    }
+                except (KeyError, TypeError, ValueError) as exc:
+                    raise SchemaDriftError("prometheus: malformed sample") from exc
+                records.append(self._raw(self.streams["metrics"], item, now))
+        else:
+            raise ConfigError(f"unknown stream {stream}")
+        return FetchResult(records=records, checkpoint=Checkpoint(cursor={"last_pull": iso(now)}), has_more=False)
 
     def parse_webhook(self, body: dict[str, Any]) -> list[tuple[str, RawRecord]]:
         """Alertmanager webhook_config payload: {"version": "4", "alerts": [...]}."""

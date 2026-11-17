@@ -4,7 +4,9 @@ vendor: CNCF
 category: observability
 version: 0.1.0
 sdk: ">=1.0,<2.0"
-certification: sandbox
+certification: live-verified
+# P8 (ADR-0019): fetch_live reads the real Alertmanager v2 and Prometheus HTTP APIs (read-only).
+live_read: true
 docs_reference: "Alertmanager API v2 /api/v2/alerts and webhook_config payload; Prometheus HTTP API query_range"
 auth_types: [none, bearer]
 streams:
@@ -20,6 +22,9 @@ config_schema:
   properties:
     alertmanager_url: {type: string}
     prometheus_url: {type: string}
+    metrics_query: {type: string, maxLength: 500}
+    # Plain http only for an operator allow-listed private host, and never with credentials.
+    allow_http: {type: boolean}
   additionalProperties: false
 secrets_schema:
   type: object

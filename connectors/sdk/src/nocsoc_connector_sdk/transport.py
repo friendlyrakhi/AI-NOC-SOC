@@ -130,25 +130,54 @@ async def _default_resolver(host: str) -> list[str]:
     return [str(info[4][0]) for info in infos]
 
 
-async def check_egress(url: str, resolver: Resolver = _default_resolver) -> str:
+# Platform services: never a vendor destination, even if an operator lists them (ADR-0019).
+PLATFORM_HOSTS = frozenset(
+    {
+        "postgres", "valkey", "clickhouse", "opensearch", "opensearch-setup", "redpanda", "api", "web", "edge",
+        "openbao", "temporal", "ai-gateway", "otel-lgtm", "keycloak", "mailpit", "ingest-worker", "workflow-worker",
+    }
+)  # fmt: skip
+
+
+def _never(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Addresses no allow-list can open: loopback, link-local (cloud metadata), unspecified, multicast."""
+    return ip.is_loopback or ip.is_link_local or ip.is_unspecified or ip.is_multicast
+
+
+async def check_egress(
+    url: str,
+    resolver: Resolver = _default_resolver,
+    *,
+    private_allowlist: frozenset[str] = frozenset(),
+    allow_http: bool = False,
+) -> str:
     """Validates a vendor URL before any request (T12). Returns the normalized base URL.
 
-    Rules: https only; no userinfo; host must resolve; every resolved address must be public
-    (blocks loopback, RFC 1918, link-local/metadata 169.254.0.0/16, ULA, multicast, ...).
+    Default rules: https only; no userinfo; host must resolve; every resolved address must be
+    public (blocks loopback, RFC 1918, link-local/metadata 169.254.0.0/16, ULA, multicast, ...).
+
+    P8 (ADR-0019): hosts in the operator's ``private_allowlist`` (``NOCSOC_EGRESS_PRIVATE_ALLOWLIST``)
+    may resolve to private addresses, for on-premises tools. Loopback, link-local/metadata and the
+    platform's own services stay blocked. Plain http is allowed only for an allow-listed host and
+    only when ``allow_http`` is set (callers never send credentials over it).
     """
     parts = urlsplit(url.strip())
-    if parts.scheme != "https":
+    host = (parts.hostname or "").lower()
+    loopback_name = host == "localhost" or host.endswith(".localhost")
+    listed = bool(host) and host in private_allowlist and host not in PLATFORM_HOSTS and not loopback_name
+    if parts.scheme != "https" and not (parts.scheme == "http" and listed and allow_http):
         raise EgressBlockedError("only https:// vendor URLs are allowed")
     if parts.username or parts.password:
         raise EgressBlockedError("credentials in URLs are not allowed")
-    host = parts.hostname
     if not host:
         raise EgressBlockedError("URL has no host")
+    if host in PLATFORM_HOSTS:
+        raise EgressBlockedError("platform services are not vendor destinations")
     try:
         literal = ipaddress.ip_address(host)
         addresses = [str(literal)]
     except ValueError:
-        if host.endswith((".local", ".internal", ".localhost")) or host == "localhost":
+        if not listed and (host.endswith((".local", ".internal", ".localhost")) or host == "localhost"):
             raise EgressBlockedError("internal host names are not allowed") from None
         try:
             addresses = await resolver(host)
@@ -157,10 +186,63 @@ async def check_egress(url: str, resolver: Resolver = _default_resolver) -> str:
     if not addresses:
         raise EgressBlockedError("host does not resolve")
     for address in addresses:
-        if not _is_public(ipaddress.ip_address(address)):
+        ip = ipaddress.ip_address(address)
+        if _never(ip) or not (_is_public(ip) or listed):
             raise EgressBlockedError("destination address is not public")
     port = f":{parts.port}" if parts.port else ""
-    return f"https://{host}{port}{parts.path.rstrip('/')}"
+    return f"{parts.scheme}://{host}{port}{parts.path.rstrip('/')}"
+
+
+class LiveHttp:
+    """HTTP for live reads (P8): every request re-validates its destination (``check_egress``),
+    never follows redirects, caps response size, and maps vendor errors to SDK errors. Connectors
+    with several endpoints (e.g. Prometheus and Alertmanager) pass the base URL per request."""
+
+    def __init__(
+        self,
+        headers: dict[str, str] | None = None,
+        *,
+        private_allowlist: frozenset[str] = frozenset(),
+        allow_http: bool = False,
+        resolver: Resolver = _default_resolver,
+        timeout: float = 15.0,
+        transport: Any = None,
+    ) -> None:
+        self._headers = dict(headers or {})
+        self._allowlist = private_allowlist
+        self._allow_http = allow_http
+        self._resolver = resolver
+        self._timeout = timeout
+        self._transport = transport  # tests inject httpx.MockTransport
+
+    async def get_json(self, base_url: str, path: str, params: dict[str, Any] | None = None) -> Any:
+        import httpx
+
+        base = await check_egress(
+            base_url, self._resolver, private_allowlist=self._allowlist, allow_http=self._allow_http
+        )
+        if base.startswith("http://") and self._headers:
+            raise EgressBlockedError("credentials are never sent over plain http")
+        async with httpx.AsyncClient(
+            timeout=self._timeout, follow_redirects=False, headers=self._headers, transport=self._transport
+        ) as client:
+            try:
+                resp = await client.get(f"{base}{path}", params=params)
+            except httpx.TransportError as exc:
+                raise TransientError(f"vendor unreachable: {type(exc).__name__}") from exc
+        if resp.status_code in (401, 403):
+            raise AuthError(f"vendor returned HTTP {resp.status_code}")
+        if resp.status_code == 429:
+            raise RateLimitedError(retry_after=float(resp.headers.get("retry-after", "30") or 30))
+        if 300 <= resp.status_code < 400:
+            raise EgressBlockedError("redirects are not followed")
+        if resp.status_code >= 500:
+            raise TransientError(f"vendor returned HTTP {resp.status_code}")
+        if resp.status_code >= 400:
+            raise SchemaDriftError(f"vendor returned HTTP {resp.status_code}")
+        if len(resp.content) > MAX_RESPONSE_BYTES:
+            raise SchemaDriftError("response too large")
+        return resp.json()
 
 
 class HttpTransport:

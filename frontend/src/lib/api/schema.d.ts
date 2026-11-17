@@ -3219,6 +3219,11 @@ export interface components {
             docs_reference: string;
             /** Id */
             id: string;
+            /**
+             * Live Read
+             * @default false
+             */
+            live_read: boolean;
             /** Name */
             name: string;
             /** Scenarios */
@@ -3885,6 +3890,12 @@ export interface components {
             };
             /** Definition Id */
             definition_id: string;
+            /**
+             * Mode
+             * @default sandbox
+             * @enum {string}
+             */
+            mode: "sandbox" | "live";
             /** Name */
             name: string;
         };
@@ -3918,9 +3929,9 @@ export interface components {
             last_success_at: string | null;
             /**
              * Mode
-             * @constant
+             * @enum {string}
              */
-            mode: "sandbox";
+            mode: "sandbox" | "live";
             /** Name */
             name: string;
             /**
@@ -3974,9 +3985,9 @@ export interface components {
             last_success_at: string | null;
             /**
              * Mode
-             * @constant
+             * @enum {string}
              */
-            mode: "sandbox";
+            mode: "sandbox" | "live";
             /** Name */
             name: string;
             /**
@@ -5532,9 +5543,9 @@ export interface components {
             };
             /**
              * Mode
-             * @constant
+             * @enum {string}
              */
-            mode: "sandbox";
+            mode: "sandbox" | "live";
             /** Sync Requested At */
             sync_requested_at: string | null;
             /**

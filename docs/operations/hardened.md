@@ -42,7 +42,26 @@ The CA key sits next to the certificates in the git-ignored, ACL-restricted secr
 - `openbao-setup` runs on every start. It initialises OpenBao once, unseals it, ensures the Transit key `nocsoc-master` (AES-256-GCM, not exportable), and ensures an AppRole whose policy can only request and unwrap data keys with that key.
   - The AppRole's role id and secret id go to a volume mounted read-only by the API and the migrate job.
 - After the stack is up, `dev.ps1 up -Hardened` runs `app.tools.rewrap_secrets`. It re-encrypts every existing local-key secret (connector credentials, webhook secrets, MFA secrets) under OpenBao. The command is idempotent and reports `remaining_v1: 0` when done.
-- **Dev-grade unseal.** The unseal key and root token are stored in the `baoinit` volume, which only the setup job mounts, so the stack can unseal itself. Production replaces this with KMS auto-unseal or Shamir shares held by operators. This is a prerequisite of P8.
+- **Dev-grade unseal (`NOCSOC_OPENBAO_UNSEAL=auto`, the default).** The unseal key and root token are stored in the `baoinit` volume, which only the setup job mounts, so the stack can unseal itself. Live connectors are refused in this mode.
+- **Shamir unseal (`NOCSOC_OPENBAO_UNSEAL=shamir`, required for live connectors, P8).** Nothing that can unseal OpenBao is stored on the host:
+  ```powershell
+  scripts\openbao.ps1 init     # once: prints 3 shares (any 2 unseal), configures Transit + AppRole, revokes the root token
+  scripts\openbao.ps1 unseal   # after every restart: asks for 2 shares (hidden input, passed on stdin)
+  scripts\openbao.ps1 status
+  ```
+  The shares are shown **once**. Store them apart, offline. Until OpenBao is unsealed the setup job waits (up to 30 minutes) and the API cannot decrypt credentials. Key rotation then needs a short-lived root token generated from the shares (`bao operator generate-root`).
+
+## Live-read connectors (P8, ADR-0019)
+
+A live instance can be created only when **all** hold, and each is checked separately:
+- `NOCSOC_LIVE_READ_ENABLED=true` (API and runner; the runner is not handed live work otherwise);
+- the OpenBao provider with Shamir unseal;
+- the connector declares `live_read` and is in the catalog with a `fetch_live`;
+- the user has stepped up; the creation is audited.
+
+Egress from the runner goes through `LiveHttp`: `https` to public addresses; private, on-premises hosts only when listed in `NOCSOC_EGRESS_PRIVATE_ALLOWLIST`; never loopback, link-local, metadata or platform service names; no redirects; credentials never over `http`. Live connectors cannot write, and actions stay simulated.
+
+`python scripts/verify_live.py` repeats the Prometheus/Alertmanager verification in a throwaway project against the real binaries (compose profile `verify`) and writes `reports\live-verification-prometheus.json`.
 - **Key rotation:**
   ```bash
   bao write -f transit/keys/nocsoc-master/rotate
@@ -56,4 +75,4 @@ The CA key sits next to the certificates in the git-ignored, ACL-restricted secr
   - only the API and migrate job can mount the AppRole volume;
   - only the setup job can mount the init volume;
   - the web app publishes no port and its cookies are `Secure`.
-- `python scriptserify_hardened.py` repeats the live verification in a throwaway project (your dev data is untouched) and writes `reports\hardened-verification.json`. The P7 exit review records its results: TLS handshakes, a rejected plain connection, sign-in through the edge, and OpenBao-encrypted secrets.
+- `python scripts/verify_hardened.py` repeats the live verification in a throwaway project (your dev data is untouched) and writes `reports\hardened-verification.json`. The P7 exit review records its results: TLS handshakes, a rejected plain connection, sign-in through the edge, and OpenBao-encrypted secrets.

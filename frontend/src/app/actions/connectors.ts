@@ -54,6 +54,33 @@ export async function createInstance(_: FormState, form: FormData): Promise<Form
   };
 }
 
+/** P8 (ADR-0019): a live, read-only instance. Needs step-up; the API checks every other gate. */
+export async function createLiveInstance(_: FormState, form: FormData): Promise<FormState> {
+  let config: Record<string, unknown>;
+  try {
+    const parsed: unknown = JSON.parse(str(form, "config") || "{}");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+    config = parsed as Record<string, unknown>;
+  } catch {
+    return { ok: false, error: "Configuration must be a JSON object, e.g. {\"alertmanager_url\": \"https://…\"}." };
+  }
+  const code = str(form, "mfa_code");
+  if (code) {
+    const s = await apiFetch("/auth/step-up", { method: "POST", body: { code } });
+    if (!s.ok) return { ok: false, error: s.problem.detail ?? s.problem.title };
+  }
+  const r = await apiFetch<Schemas["InstanceCreated"]>("/connectors/instances", {
+    method: "POST",
+    body: { definition_id: str(form, "definition_id"), name: str(form, "name"), config, mode: "live" },
+  });
+  if (!r.ok) return fail(r);
+  refresh();
+  return {
+    ok: true,
+    message: `Added "${r.data.name}" in live (read-only) mode. Add its credentials, then watch its health after the first pull.`,
+  };
+}
+
 export async function setEnabled(_: FormState, form: FormData): Promise<FormState> {
   const id = instanceId(form);
   const enabled = str(form, "enabled") === "true";

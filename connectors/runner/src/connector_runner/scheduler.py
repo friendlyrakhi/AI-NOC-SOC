@@ -20,7 +20,7 @@ from pydantic import ValidationError
 from connector_runner.api import PlatformApi
 from connector_runner.bus import Bus, envelope, publish
 from connector_runner.health import InstanceHealth, TokenBucket, error_class, safe_detail
-from nocsoc_connector_sdk import Checkpoint, Connector, ConnectorContext, SchemaDriftError
+from nocsoc_connector_sdk import Checkpoint, Connector, ConnectorContext, LiveHttp, SchemaDriftError
 from nocsoc_connectors import REGISTRY
 
 logger = logging.getLogger("connector_runner")
@@ -41,8 +41,24 @@ class _Cached:
 
 
 class Scheduler:
-    def __init__(self, api: PlatformApi, bus: Bus, *, max_pages: int = 10, concurrency: int = 8) -> None:
+    def __init__(
+        self,
+        api: PlatformApi,
+        bus: Bus,
+        *,
+        max_pages: int = 10,
+        concurrency: int = 8,
+        live_read_enabled: bool = False,
+        private_allowlist: frozenset[str] = frozenset(),
+        live_transport: Any = None,
+        live_resolver: Any = None,
+    ) -> None:
         self.api = api
+        # P8 (ADR-0019): live (read-only) instances need this runner-side switch as well.
+        self.live_read_enabled = live_read_enabled
+        self.private_allowlist = private_allowlist
+        self.live_transport = live_transport  # tests inject httpx.MockTransport
+        self.live_resolver = live_resolver  # tests inject a fixed DNS answer
         self.bus = bus
         self.max_pages = max_pages
         self.sem = asyncio.Semaphore(concurrency)
@@ -63,11 +79,25 @@ class Scheduler:
         cached = self._connectors.get(iid)
         if cached is None or cached.fingerprint != fp:
             cls = REGISTRY[item["definition_id"]]
-            if item.get("mode") != "sandbox":  # guardrail #1: live mode does not exist in this build
-                raise RuntimeError("refusing non-sandbox instance")
+            mode = item.get("mode")
             secrets = await self.api.credentials(iid)
-            ctx = ConnectorContext(tenant_id=str(item["tenant_id"]), instance_id=iid, mode="sandbox")
-            cached = _Cached(fp, cls(ctx, item["config"], secrets))
+            if mode == "live":
+                if not self.live_read_enabled:
+                    raise RuntimeError("refusing live instance: live reads are disabled in this runner")
+                http = LiveHttp(
+                    cls.live_headers(secrets),
+                    private_allowlist=self.private_allowlist,
+                    allow_http=bool(item["config"].get("allow_http")),
+                    transport=self.live_transport,
+                    **({"resolver": self.live_resolver} if self.live_resolver else {}),
+                )
+                ctx = ConnectorContext(tenant_id=str(item["tenant_id"]), instance_id=iid, mode="live")
+                cached = _Cached(fp, cls(ctx, item["config"], secrets, http=http))
+            elif mode == "sandbox":
+                ctx = ConnectorContext(tenant_id=str(item["tenant_id"]), instance_id=iid, mode="sandbox")
+                cached = _Cached(fp, cls(ctx, item["config"], secrets))
+            else:
+                raise RuntimeError(f"refusing instance with unknown mode {mode!r}")
             self._connectors[iid] = cached
             self.buckets[iid] = TokenBucket(cls.manifest.rate_limit_per_minute)
         return cached.connector

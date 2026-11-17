@@ -52,6 +52,27 @@ def check(config: dict) -> list[str]:
     problems += check_search_isolation(config)
     problems += check_anchor_isolation(config)
     problems += check_telemetry_isolation(config)
+    problems += check_vendor_isolation(config)
+    return problems
+
+
+# P8: vendor systems (verification targets, on-premises tools) are reachable by the runner only, and
+# the verification targets reach nothing of the platform.
+VENDOR_MEMBERS = {"connector-runner", "prometheus-demo", "alertmanager-demo"}
+
+
+def check_vendor_isolation(config: dict) -> list[str]:
+    services = config.get("services", {})
+    problems = []
+    if "vendors" in config.get("networks", {}) and not (config["networks"]["vendors"] or {}).get("internal"):
+        problems.append("network 'vendors' must be internal")
+    for name, svc in services.items():
+        if "vendors" in _networks(svc) and name not in VENDOR_MEMBERS:
+            problems.append(f"{name}: must not join the 'vendors' network")
+        if name in {"prometheus-demo", "alertmanager-demo"} and _networks(svc) != {"vendors"}:
+            problems.append(f"{name}: must be attached only to network 'vendors'")
+        if name in {"prometheus-demo", "alertmanager-demo"} and (svc.get("secrets") or svc.get("ports")):
+            problems.append(f"{name}: verification targets get no secrets and publish no ports")
     return problems
 
 
