@@ -17,6 +17,11 @@ describe("role-based navigation", () => {
     expect(labels(nav.soc)).toContain("Incidents");
   });
 
+  it("shows the approvals inbox only to approvers", () => {
+    expect(labels(buildNav(["playbook:read", "action:approve"], "customer", false).ops)).toEqual(["Automation", "Approvals"]);
+    expect(labels(buildNav(["playbook:read", "action:request"], "customer", false).ops)).toEqual(["Automation"]);
+  });
+
   it("gives an empty menu when nothing is permitted", () => {
     const nav = buildNav([], null, false);
     expect(nav.noc).toEqual([]);

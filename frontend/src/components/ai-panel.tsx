@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { ActionForm } from "@/components/action-form";
 import { askIncidentAi, rateRun, runIncidentAi } from "@/app/actions/ai";
+import { RequestActionForm } from "@/components/automation";
+import type { CatalogEntry } from "@/lib/server/automation";
 import type { components } from "@/lib/api/schema";
 import { formatTime } from "@/lib/format";
 
@@ -9,7 +11,7 @@ import { formatTime } from "@/lib/format";
  * Copilot panel. AI output is rendered as plain text only (never HTML or markdown), always
  * labelled as AI-generated with its provider, template and validation status, and every
  * statement shows chips linking to the evidence it cites. Suggested actions are suggestions:
- * nothing here can perform them.
+ * a user may turn one into an action request, which always needs a human approver.
  */
 type Run = components["schemas"]["AiRunOut"];
 type Output = {
@@ -42,7 +44,7 @@ function evidenceHref(e: Run["evidence"][number]): string | null {
   return null;
 }
 
-function RunCard({ run, back }: { run: Run; back: string }) {
+function RunCard({ run, back, incidentId, requestable }: { run: Run; back: string; incidentId: string; requestable: CatalogEntry[] | null }) {
   const out = run.output as Output;
   const anchor = (ref: string) => `ev-${run.id.slice(0, 8)}-${ref}`;
   const byRef = new Map(run.evidence.map((e) => [e.ref, e]));
@@ -97,7 +99,7 @@ function RunCard({ run, back }: { run: Run; back: string }) {
       )}
       {out.suggested_actions.length > 0 && (
         <div className="mt-2">
-          <p className="text-xs font-semibold">Suggested actions (not performed; each would need approval)</p>
+          <p className="text-xs font-semibold">Suggested actions (not performed; requesting one always needs a human approver)</p>
           <ul className="list-disc pl-5 text-xs">
             {out.suggested_actions.map((a, i) => (
               <li key={i}>
@@ -107,6 +109,20 @@ function RunCard({ run, back }: { run: Run; back: string }) {
                     {ref}
                   </a>
                 ))}
+                {requestable?.some((c) => c.key === a.action_key && c.allowed) && run.validation_status !== "rejected" && (
+                  <details className="mt-1">
+                    <summary className="text-primary cursor-pointer">Request this action</summary>
+                    <div className="mt-2">
+                      <RequestActionForm
+                        catalog={requestable}
+                        incidentId={incidentId}
+                        aiRunId={run.id}
+                        actionKey={a.action_key}
+                        justification={`AI suggestion: ${a.rationale}`.slice(0, 1000)}
+                      />
+                    </div>
+                  </details>
+                )}
               </li>
             ))}
           </ul>
@@ -147,7 +163,18 @@ function RunCard({ run, back }: { run: Run; back: string }) {
   );
 }
 
-export function AiPanel({ incidentId, runs, canUse }: { incidentId: string; runs: Run[]; canUse: boolean }) {
+export function AiPanel({
+  incidentId,
+  runs,
+  canUse,
+  requestable = null,
+}: {
+  incidentId: string;
+  runs: Run[];
+  canUse: boolean;
+  /** Catalog entries the caller may request (null: may not request actions). */
+  requestable?: CatalogEntry[] | null;
+}) {
   const back = `/incidents/${incidentId}`;
   return (
     <section aria-labelledby="copilot-title" className="border-border rounded-lg border p-4">
@@ -184,7 +211,7 @@ export function AiPanel({ incidentId, runs, canUse }: { incidentId: string; runs
         </div>
       )}
       <div className="space-y-3">
-        {runs.length === 0 ? <p className="text-muted text-sm">No AI analysis yet.</p> : runs.map((r) => <RunCard key={r.id} run={r} back={back} />)}
+        {runs.length === 0 ? <p className="text-muted text-sm">No AI analysis yet.</p> : runs.map((r) => <RunCard key={r.id} run={r} back={back} incidentId={incidentId} requestable={requestable} />)}
       </div>
     </section>
   );

@@ -145,7 +145,7 @@ sequenceDiagram
 1. A human or the AI proposes an action. An `ActionRequest` is created with tier, target, parameters and justification.
 2. The policy engine evaluates tier, tenant policy, the target asset's criticality, the kill switch and the execution mode. The decision is `auto | approve_1 | approve_2 | deny`.
 3. If approval is needed, an Approval task appears in the Approvals inbox. Approvers must be distinct from the requester and from each other, MFA step-up is required, and approvals expire (default 30 min).
-4. Once approved, the Temporal workflow runs an `execute_action` activity, which calls the connector-runner with `mode=simulate`. The runner returns the simulated result plus before/after state.
+4. Once approved, the Temporal workflow runs an `execute_action` activity in the workflow worker. The worker first claims the request from the API, which re-checks the approvals and the kill switch in the database. It then runs the sandbox connector's action with `mode=simulate` (or `dry_run`), and the result, including before/after state, goes back to the API. *(As built in P5: executors run in the worker, which has the connector runner's isolation.)*
 5. The timeline, audit log and notifications are updated.
 
 ## 6. Cross-cutting concerns
@@ -192,7 +192,7 @@ OpenTelemetry SDKs in Python and Next.js → OTel Collector. Dev default: the co
 | `core` | postgres(+pgvector), valkey, api, web, mailpit | ~2.5–3.5 GB | P1 |
 | `stream` | redpanda (single node, `--smp 1 --memory 1G`), redpanda-console (optional), ingest-worker, connector-runner | +1.5 GB | P2 |
 | `analytics` | clickhouse (capped `max_server_memory_usage`) | +1–1.5 GB | P2 |
-| `workflow` | temporal (auto-setup w/ postgres), temporal-ui, workflow-worker | +1 GB | P5 |
+| `workflow` | temporal (dev server, SQLite volume; as built in P5), workflow-worker | +~0.2 GB measured | P5 |
 | `ai` | ai-gateway; optional `ollama` (CPU-only small models; big RAM cost) | +0.3 GB (+4–8 GB w/ Ollama) | P4 |
 | `search` | opensearch single-node (`-Xms1g -Xmx1g`, security plugin on), dashboards optional | +1.5–2 GB | P6 |
 | `observability` | otel-collector, grafana/otel-lgtm | +1 GB | P7 (optional earlier) |

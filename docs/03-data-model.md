@@ -135,6 +135,13 @@ erDiagram
 | `approvals` | id, tenant_id, action_request_id, approver_id, decision(`approve/deny`), comment, mfa_verified_at, decided_at | Unique (action_request_id, approver_id); check approver ≠ requester. |
 | `kill_switches` | scope(`global/tenant`), tenant_id, engaged bool, engaged_by, reason, at | |
 
+**As built in P5 (migration 0005):**
+- The catalog is code (connector manifests plus platform actions), not a table.
+- Tables: `action_policies`, `playbooks`, `playbook_versions`, `workflow_runs` (with `steps` jsonb per step), `action_requests`, `approvals`, and `tenant_kill_switches`, all FORCE RLS. There is also `global_kill_switch` (one row, platform-wide, changed only through `set_global_kill_switch()`).
+- `action_requests.execution_mode` is constrained to `dry_run` and `simulate`; `live` is not storable.
+- Each request has a unique `(tenant_id, idempotency_key)`.
+- Triggers: `approval_guard` rejects approver = requester, and the application role has no UPDATE on `approvals`. `playbook_version_guard` makes published and retired versions immutable and undeletable.
+
 ### 2.9 AI
 | Table | Key columns | Notes |
 |-------|-------------|-------|

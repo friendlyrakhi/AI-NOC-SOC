@@ -60,6 +60,9 @@ TENANTS = [
             SeedUser("admin@globex.example", "Gail Admin (Globex)", ["tenant_admin"]),
             SeedUser("noc@globex.example", "Gus Engineer (Globex)", ["noc_engineer"]),
             SeedUser("auditor@globex.example", "Ada Auditor (Globex)", ["auditor"]),
+            # P5: two independent approvers (T3 actions need two people besides the requester).
+            SeedUser("approver.one@globex.example", "Olu Approver (Globex)", ["approver"]),
+            SeedUser("approver.two@globex.example", "Tara Approver (Globex)", ["approver"]),
         ],
         parent="acme-msp",
     ),
@@ -70,6 +73,8 @@ TENANTS = [
         [
             SeedUser("admin@initech.example", "Ian Admin (Initech)", ["tenant_admin"]),
             SeedUser("soc@initech.example", "Ivy Responder (Initech)", ["soc_analyst_l2"]),
+            SeedUser("approver.one@initech.example", "Otto Approver (Initech)", ["approver"]),
+            SeedUser("approver.two@initech.example", "Tess Approver (Initech)", ["approver"]),
         ],
         parent="acme-msp",
     ),
@@ -206,6 +211,7 @@ DEMO_INTEGRATIONS: dict[str, list[str]] = {
         "wazuh",
         "qualys.vmdr",
         "datadog",
+        "servicenow.itsm",
     ],
 }
 
@@ -284,17 +290,95 @@ def seed_demo_knowledge(settings: Settings) -> int:
     return created
 
 
+def seed_missing_users(settings: Settings) -> list[dict[str, object]]:
+    """Idempotent: creates seed users added in later phases (e.g. P5 approvers) in an existing
+    dev database. Returns their credentials (only for users created now)."""
+    if settings.environment != "dev":
+        raise SystemExit("seeding is only allowed in the dev environment")
+    if settings.master_key is None:
+        raise SystemExit("missing secret: master_key")
+    envelope = LocalEnvelopeProvider(settings.master_key.get_secret_value())
+    engine = create_engine(settings.superuser_database_url())
+    out: list[dict[str, object]] = []
+    try:
+        with engine.begin() as conn:
+            roles = {r.key: r.id for r in conn.execute(text("SELECT key, id FROM roles WHERE is_system"))}
+            for t in TENANTS:
+                tid = conn.execute(text("SELECT id FROM tenants WHERE slug = :s"), {"s": t.slug}).scalar_one_or_none()
+                if tid is None:
+                    continue
+                for u in t.users:
+                    if conn.execute(text("SELECT 1 FROM users WHERE email = :e"), {"e": u.email}).first():
+                        continue
+                    info = _create_user(conn, envelope, u)
+                    mid = conn.execute(
+                        text("INSERT INTO memberships (tenant_id, user_id) VALUES (:t, :u) RETURNING id"),
+                        {"t": tid, "u": info["id"]},
+                    ).scalar_one()
+                    for role in u.roles:
+                        conn.execute(
+                            text("INSERT INTO role_bindings (tenant_id, membership_id, role_id) VALUES (:t, :m, :r)"),
+                            {"t": tid, "m": mid, "r": roles[role]},
+                        )
+                    _audit(conn, tid, "user.create", {"email": u.email, "roles": u.roles, "source": "seed"})
+                    out.append({**info, "id": str(info["id"]), "tenant": t.slug, "roles": u.roles})
+    finally:
+        engine.dispose()
+    return out
+
+
+def seed_demo_playbooks(settings: Settings) -> int:
+    """Idempotent: the three DEMO sample playbooks, published as version 1, per demo tenant."""
+    if settings.environment != "dev":
+        raise SystemExit("seeding is only allowed in the dev environment")
+    from app.actions.dsl import validate_definition
+    from app.actions.samples import SAMPLE_PLAYBOOKS
+
+    engine = create_engine(settings.superuser_database_url())
+    created = 0
+    try:
+        with engine.begin() as conn:
+            for slug in DEMO_INTEGRATIONS:
+                tid = conn.execute(text("SELECT id FROM tenants WHERE slug = :s"), {"s": slug}).scalar_one_or_none()
+                if tid is None:
+                    continue
+                for pb in SAMPLE_PLAYBOOKS:
+                    parsed, problems = validate_definition(pb["definition"])
+                    if parsed is None:
+                        raise SystemExit(f"invalid sample playbook {pb['key']}: {problems}")
+                    pid = conn.execute(
+                        text(
+                            "INSERT INTO playbooks (tenant_id, key, name, domain, description) VALUES (:t, :k, :n, "
+                            ":d, :ds) "
+                            "ON CONFLICT (tenant_id, key) DO NOTHING RETURNING id"
+                        ),
+                        {"t": tid, "k": pb["key"], "n": pb["name"], "d": pb["domain"], "ds": pb["description"]},
+                    ).scalar_one_or_none()
+                    if pid is None:
+                        continue
+                    conn.execute(
+                        text(
+                            "INSERT INTO playbook_versions (tenant_id, playbook_id, version, definition, status, "
+                            "published_at) "
+                            "VALUES (:t, :p, 1, CAST(:d AS jsonb), 'published', now())"
+                        ),
+                        {"t": tid, "p": pid, "d": json.dumps(parsed.model_dump())},
+                    )
+                    created += 1
+    finally:
+        engine.dispose()
+    return created
+
+
 if __name__ == "__main__":
     settings = get_settings()
     result = seed(settings)
+    new_users = seed_missing_users(settings) if result is None else []
     integrations = seed_demo_integrations(settings)
     runbooks = seed_demo_knowledge(settings)
+    playbooks = seed_demo_playbooks(settings)
+    extra = {"demo_integrations_created": integrations, "runbooks": runbooks, "playbooks": playbooks}
     if result is None:
-        print(json.dumps({"status": "already_seeded", "demo_integrations_created": integrations, "runbooks": runbooks}))
+        print(json.dumps({"status": "already_seeded", "new_users": new_users, **extra}))
         sys.exit(0)
-    print(
-        json.dumps(
-            {"status": "seeded", "users": result, "demo_integrations_created": integrations, "runbooks": runbooks},
-            indent=2,
-        )
-    )
+    print(json.dumps({"status": "seeded", "users": result, **extra}, indent=2))

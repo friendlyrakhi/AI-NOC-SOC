@@ -72,6 +72,7 @@ known-first-party = ["app", "nocsoc_connector_sdk", "nocsoc_connectors", "connec
 "backend/app/incidents/**" = ["S608"]
 "backend/app/topology.py" = ["S608"]
 "backend/app/ai/**" = ["S608"]
+"backend/app/actions/**" = ["S608"]
 # Vendor-shaped sandbox payload literals read best on one line each.
 "connectors/catalog/src/nocsoc_connectors/**" = ["E501"]
 
@@ -115,6 +116,12 @@ source_modules = ["ai_gateway"]
 forbidden_modules = ["workflow_worker", "connector_runner", "app", "nocsoc_connectors", "nocsoc_connector_sdk"]
 
 [[tool.importlinter.contracts]]
+name = "Workflow worker is a separate runtime (no platform internals, no AI)"
+type = "forbidden"
+source_modules = ["workflow_worker"]
+forbidden_modules = ["app", "ai_gateway", "connector_runner"]
+
+[[tool.importlinter.contracts]]
 name = "API AI module cannot reach executors or connectors (AI-5, LLM06)"
 type = "forbidden"
 source_modules = ["app.ai"]
@@ -123,6 +130,7 @@ forbidden_modules = [
   "app.incidents.router",
   "app.ingestion",
   "app.workers",
+  "app.actions",  # action requests and executors' API (AI may only suggest)
   "nocsoc_connectors",  # the catalog: connector classes that can execute actions
   "connector_runner",
   "workflow_worker",

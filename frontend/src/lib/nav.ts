@@ -79,6 +79,7 @@ export const OPERATIONS_SECTION: NavSection = {
   items: [
     { label: "Incidents", href: "/incidents", perm: "incident:read" },
     { label: "Automation", href: "/automation", perm: "playbook:read" },
+    { label: "Approvals", href: "/automation/approvals", perm: "action:approve" },
     { label: "Connectors", href: "/connectors", perm: "connector:read" },
     { label: "Knowledge base", href: "/knowledge", perm: "knowledge:read" },
     { label: "Reports", href: "/reports", perm: "report:read" },

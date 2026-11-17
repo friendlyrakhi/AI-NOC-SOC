@@ -166,9 +166,9 @@ export function SectionTitle({ children, action }: { children: ReactNode; action
 export function StateBadge({ value }: { value: string }) {
   const label = value.replace(/_/g, " ");
   const tone =
-    /^(open|new|failed|retest_failed|denied|down|awaiting_approval|pending)$/.test(value)
+    /^(open|new|failed|retest_failed|denied|down|awaiting_approval|pending|pending_approval|halted)$/.test(value)
       ? "border-danger/40 text-danger"
-      : /^(investigating|in_progress|acknowledged|running|scheduled|planned|retest|contained|draft)$/.test(value)
+      : /^(investigating|in_progress|acknowledged|running|executing|scheduled|planned|retest|contained|draft)$/.test(value)
         ? "border-caution/60 text-warning"
         : /^(resolved|closed|mitigated|fixed|remediated|retest_passed|succeeded|approved|completed|published|reported|done)$/.test(value)
           ? "border-success/40 text-success"

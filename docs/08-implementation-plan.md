@@ -150,11 +150,13 @@ Deliverables:
 - Executors via connector-runner in **simulate** mode only; dry-run previews; timeline + audit integration.
 - Sample playbooks: "Enrich & ticket" (T0/T1), "Restart unhealthy service" (T2), "Contain host" (T3).
 
-**Exit criteria:**
-- [ ] T3 action cannot execute without two distinct approvers; self-approval blocked; expired approvals rejected.
-- [ ] Worker killed mid-run → workflow resumes correctly.
-- [ ] Kill switch halts runs at next activity.
-- [ ] **SEC-ACT-01..07 pass, including "live mode impossible" release gate.**
+**Exit criteria:** (status: [reports/P5-exit-review.md](reports/P5-exit-review.md))
+- [x] T3 action cannot execute without two distinct approvers; self-approval blocked; expired approvals rejected.
+- [x] Worker killed mid-run → workflow resumes correctly.
+- [x] Kill switch halts runs at next activity.
+- [x] **SEC-ACT-01..07 pass, including "live mode impossible" release gate.**
+
+As built, executors run in the workflow worker (which has the connector runner's isolation) rather than through the connector runner; see the exit review.
 
 ---
 

@@ -69,3 +69,28 @@ export function resetTotpReplay(email: string): void {
     `PGPASSWORD="$(cat /run/secrets/postgres_password)" psql -q -U postgres -d nocsoc -h 127.0.0.1 -c "${sql}"`,
   ]);
 }
+
+/**
+ * Dev-stack test helper: links a new, uniquely named critical sandbox alert (and its asset) to
+ * an incident so that asset becomes the incident's primary asset. Repeated E2E runs then act on
+ * a fresh target instead of tripping the action loop guard (SEC-ACT-05) on the same host.
+ * Never use against anything but the local dev database.
+ */
+export function stagePrimaryAsset(tenantSlug: string, incidentNumber: string): void {
+  if (!/^INC-\d{6}$/.test(incidentNumber) || !/^[a-z0-9-]+$/.test(tenantSlug)) throw new Error(`bad incident ${tenantSlug}/${incidentNumber}`);
+  const sql = [
+    "WITH i AS (SELECT n.id, n.tenant_id FROM incidents n JOIN tenants t ON t.id = n.tenant_id",
+    `  WHERE t.slug = '${tenantSlug}' AND n.number = '${incidentNumber}'),`,
+    "a AS (INSERT INTO assets (tenant_id, type, name, criticality) SELECT tenant_id, 'host', 'e2e-host-' || substr(md5(random()::text), 1, 8), 3 FROM i RETURNING id, tenant_id),",
+    "al AS (INSERT INTO alerts (tenant_id, domain, connector_id, source_alert_id, fingerprint, title, severity, asset_id, first_seen, last_seen)",
+    "  SELECT tenant_id, 'soc', 'crowdstrike.falcon', md5(random()::text), md5(random()::text), 'E2E staged alert (DEMO)', 'critical', id, '2000-01-01', '2000-01-01' FROM a RETURNING id, tenant_id)",
+    "INSERT INTO incident_alerts (alert_id, tenant_id, incident_id, added_by, reason) SELECT al.id, al.tenant_id, i.id, 'user', 'E2E staging (dev only)' FROM al, i",
+  ].join(" ");
+  execFileSync("docker", [
+    "exec",
+    "nocsoc-postgres-1",
+    "sh",
+    "-c",
+    `PGPASSWORD="$(cat /run/secrets/postgres_password)" psql -q -v ON_ERROR_STOP=1 -U postgres -d nocsoc -h 127.0.0.1 -c "${sql}"`,
+  ]);
+}

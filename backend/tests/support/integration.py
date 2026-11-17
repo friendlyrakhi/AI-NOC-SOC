@@ -58,6 +58,7 @@ def env() -> Iterator[Env]:
             "auth_database_password": SecretStr(secrets.token_hex(16)),
             "worker_database_password": SecretStr(secrets.token_hex(16)),
             "runner_token": SecretStr(secrets.token_hex(32)),
+            "workflow_token": SecretStr(secrets.token_hex(32)),
             "postgres_password": SecretStr(pg_password),
             "valkey_host": vk.get_container_host_ip(),
             "valkey_port": int(vk.get_exposed_port(6379)),

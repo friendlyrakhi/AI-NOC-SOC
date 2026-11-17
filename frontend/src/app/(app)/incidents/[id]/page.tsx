@@ -12,6 +12,7 @@ import { formatTime, minutes } from "@/lib/format";
 import { alertColumns, alertRow, assetColumns, assetRow } from "@/lib/rows";
 import { IncidentDetail } from "@/components/incident-detail";
 import { getDemo } from "@/lib/server/demo";
+import { getIncidentAutomation } from "@/lib/server/automation";
 import { getIncidentDetail, isUuid } from "@/lib/server/pipeline";
 
 const KIND_LABEL: Record<TimelineEntry["kind"], string> = {
@@ -81,7 +82,7 @@ function Response({ incident }: { incident: Incident }) {
     <div className="space-y-3">
       <p className="text-muted text-xs">
         Steps run through the policy engine. T2 needs one approver, T3 two distinct approvers. All execution is <strong>simulated</strong>; live
-        remediation is disabled in this build. Approvals and playbooks arrive in phase P5.
+        remediation is disabled in this build. These steps are demo content; real incidents have an Actions tab.
       </p>
       <ol className="space-y-2">
         {incident.steps.map((s, i) => (
@@ -95,9 +96,9 @@ function Response({ incident }: { incident: Incident }) {
             <span className="text-muted text-xs">{s.owner}</span>
             <StateBadge value={s.status} />
             {s.status === "awaiting_approval" && (
-              <button type="button" disabled className="btn btn-ghost border-border border text-xs" title="Approval workflow arrives in phase P5">
-                Review approval (P5)
-              </button>
+              <span className="text-muted text-xs" title="Demo step: approvals work on real incidents">
+                Awaiting approval (demo)
+              </span>
             )}
           </li>
         ))}
@@ -113,7 +114,7 @@ export default async function IncidentPage({ params }: { params: Promise<{ id: s
   if (denied) return denied;
   // Real incidents (correlation or analyst) first; DEMO incidents keep their own ids.
   const real = isUuid(id) ? await getIncidentDetail(id) : null;
-  if (real) return <IncidentDetail me={me} {...real} />;
+  if (real) return <IncidentDetail me={me} {...real} automation={await getIncidentAutomation(me, real.incident.id)} />;
   const incident = data.incidents.find((i) => i.id === id);
   if (!incident) notFound();
   const now = Date.parse(data.generatedAt) + 30 * 60000;

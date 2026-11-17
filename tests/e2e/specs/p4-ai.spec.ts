@@ -80,7 +80,7 @@ test.describe("P4 AI copilot", () => {
     await triage.getByRole("button", { name: "Suggest triage" }).click();
     const card = page.getByRole("article", { name: "Triage suggestion (AI-generated)" }).first();
     await expect(card).toBeVisible({ timeout: 20_000 });
-    await expect(card.getByText("Suggested actions (not performed; each would need approval)")).toBeVisible();
+    await expect(card.getByText("Suggested actions (not performed; requesting one always needs a human approver)")).toBeVisible();
   });
 
   test("knowledge base, AI settings and search assist", async ({ page }) => {

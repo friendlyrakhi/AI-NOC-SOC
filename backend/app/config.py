@@ -66,6 +66,11 @@ class Settings(BaseSettings):
     ai_gateway_url: str | None = None
     ai_gateway_token: SecretStr | None = None
     ai_request_timeout_seconds: float = Field(default=90.0, gt=0, le=600)
+    # --- Workflow automation (P5): Temporal and the workflow worker. Optional: 503 without it.
+    temporal_address: str | None = None
+    temporal_namespace: str = "default"
+    workflow_token: SecretStr | None = None
+    approval_expiry_minutes: int = Field(default=30, ge=1, le=1440)
     # Shared token the connector-runner presents on internal endpoints.
     runner_token: SecretStr | None = None
     webhook_max_bytes: int = Field(default=1_048_576, ge=1024, le=10_485_760)

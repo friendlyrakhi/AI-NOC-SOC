@@ -185,6 +185,15 @@ AI response shape:
 | POST | `/workflow-runs/{id}/cancel` | `playbook:run` | |
 | GET/POST | `/killswitch` `{engaged, reason}` | `automation:killswitch` (step-up) | tenant scope; global via platform |
 
+**As built in P5:**
+- Policies are `PUT /actions/policies/{action_key}` `{allowed, require_justification, tier_override}`; the catalog (`GET /actions/catalog`) shows each action's effective tier and tenant policy.
+- `POST /actions/requests` takes `{action_key, asset_id?, incident_id?, params, justification, mode, ai_run_id?}`. An asset action given only an incident targets the incident's primary asset. With `ai_run_id` the request counts as AI-originated: that run must have suggested the action, and it always needs a human approver.
+- `GET /actions/requests` filters by `status`, `incident_id` and `workflow_run_id`.
+- Playbooks: `POST /playbooks` and `POST /playbooks/{id}/versions` create drafts (validated DSL); there is no PATCH because published versions are immutable. Publishing retires the previous version.
+- `POST /platform/killswitch` (platform admin, step-up) sets the global switch.
+- The workflow worker uses `/internal/workflow/*` with `X-Workflow-Token`. These routes claim, complete and expire requests, request playbook steps, checkpoint runs (kill switch, cancel) and record step results. The worker never touches the database.
+- Errors include `action.execution_disabled`, `action.expired`, `action.self_approval`, `action.already_decided`, `action.kill_switch`, `action.invalid_params`, `action.unknown` and `playbook.not_published`.
+
 ### 2.10 Analytics, search, command center (P6)
 | Method | Path | Perm |
 |--------|------|------|

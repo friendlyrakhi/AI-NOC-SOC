@@ -547,10 +547,12 @@ def test_demo_integrations_seed_is_idempotent_and_sandbox(stream: StreamEnv) -> 
     from app.db.seed import DEMO_INTEGRATIONS, seed_demo_integrations
 
     dev = stream.env.settings.model_copy(update={"environment": "dev"})
+    with stream.env.su() as c:  # other suites (P5) may have seeded them already in this session
+        before = c.execute("SELECT count(*) FROM connector_instances WHERE name LIKE 'DEMO %'").fetchone()[0]
     created = seed_demo_integrations(dev)
-    assert created == sum(len(v) for v in DEMO_INTEGRATIONS.values())
+    assert before + created == sum(len(v) for v in DEMO_INTEGRATIONS.values())
     assert seed_demo_integrations(dev) == 0
     with stream.env.su() as c:
         rows = c.execute("SELECT name, mode, status FROM connector_instances WHERE name LIKE 'DEMO %'").fetchall()
-    assert len(rows) == created
+    assert len(rows) == before + created
     assert all(r[1] == "sandbox" and r[2] == "pending" for r in rows), "seeded instances claim no health"

@@ -17,6 +17,7 @@ dependencies = [
   "email-validator>=2.2",
   "redis>=5.2",
   "aiokafka>=0.12",
+  "temporalio>=1.8",
   "clickhouse-connect[async]>=0.8",
   "nocsoc-connectors",
   "opentelemetry-api>=1.28",

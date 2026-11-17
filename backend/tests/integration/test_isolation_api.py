@@ -105,7 +105,46 @@ def initech_ids(api: Api) -> dict[str, str]:
     assert run.status_code == 200, run.text
     doc = api.post(INITECH_ADMIN, "/knowledge/docs", {"title": "Initech private runbook", "body": "Initech only."})
     assert doc.status_code == 201, doc.text
+    pb = api.post(
+        INITECH_ADMIN,
+        "/playbooks",
+        {
+            "key": "initech-private",
+            "name": "Initech private",
+            "domain": "soc",
+            "definition": {
+                "steps": [
+                    {"id": "note", "action": "platform.timeline_note", "target": "incident", "params": {"text": "x"}}
+                ]
+            },
+        },
+    )
+    assert pb.status_code == 201, pb.text
+    with api.env.su() as c:
+        t = api.env.tenants["initech"]
+        version_id = c.execute(
+            "SELECT id FROM playbook_versions WHERE playbook_id = %s", (pb.json()["id"],)
+        ).fetchone()[0]
+        wf_run = c.execute(
+            "INSERT INTO workflow_runs (tenant_id, playbook_version_id, incident_id, mode) VALUES (%s, %s, %s, "
+            "'simulate') "
+            "RETURNING id",
+            (t, version_id, incident.json()["id"]),
+        ).fetchone()[0]
+        action_request = c.execute(
+            "INSERT INTO action_requests (tenant_id, incident_id, action_key, connector_id, target, tier, "
+            "required_approvals, requested_by_type, policy_decision, execution_mode, status, expires_at) VALUES "
+            "(%s, %s, 'edr.isolate_host', 'crowdstrike.falcon', '{}', 'T3', 2, 'user', '{}', 'simulate', "
+            "'pending_approval', now() + interval '1 hour') RETURNING id",
+            (t, incident.json()["id"]),
+        ).fetchone()[0]
     return {
+        "request_id": str(action_request),
+        "playbook_id": pb.json()["id"],
+        "version": "1",
+        "workflow_run_id": str(wf_run),
+        "step_id": "note",
+        "action_key": "initech.private_action",
         "run_id": run.json()["id"],
         "doc_id": doc.json()["id"],
         "task": "summary",
@@ -167,6 +206,16 @@ def _initech_snapshot(api: Api) -> tuple:  # type: ignore[type-arg]
                 "SELECT ai_run_id, user_id, rating FROM ai_feedback WHERE tenant_id = %s ORDER BY 1", (t,)
             ).fetchall(),
             c.execute("SELECT id, version FROM knowledge_docs WHERE tenant_id = %s ORDER BY id", (t,)).fetchall(),
+            c.execute(
+                "SELECT id, status, version FROM action_requests WHERE tenant_id = %s ORDER BY id", (t,)
+            ).fetchall(),
+            c.execute("SELECT count(*) FROM approvals WHERE tenant_id = %s", (t,)).fetchall(),
+            c.execute(
+                "SELECT id, status, definition FROM playbook_versions WHERE tenant_id = %s ORDER BY id", (t,)
+            ).fetchall(),
+            c.execute("SELECT id, status, steps FROM workflow_runs WHERE tenant_id = %s ORDER BY id", (t,)).fetchall(),
+            c.execute("SELECT * FROM tenant_kill_switches WHERE tenant_id = %s", (t,)).fetchall(),
+            c.execute("SELECT * FROM action_policies WHERE tenant_id = %s ORDER BY action_key", (t,)).fetchall(),
         )
 
 

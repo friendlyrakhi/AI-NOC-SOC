@@ -51,7 +51,8 @@ def check(config: dict) -> list[str]:
 
 
 # Services that run connector code must not share a network with the data stores (T13).
-CONNECTOR_RUNTIMES = {"connector-runner"}
+# The workflow worker also runs connector code (action executors), so the same rules apply.
+CONNECTOR_RUNTIMES = {"connector-runner", "workflow-worker"}
 DATA_STORES = {"postgres", "valkey", "clickhouse"}
 
 

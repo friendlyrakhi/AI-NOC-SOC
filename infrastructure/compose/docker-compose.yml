@@ -123,7 +123,7 @@ services:
   api:
     <<: *hardening
     profiles: [core]
-    networks: [data, bus, frontend, ai]
+    networks: [data, bus, frontend, ai, workflow]
     build:
       context: ../..
       dockerfile: infrastructure/docker/api.Dockerfile
@@ -143,10 +143,14 @@ services:
       NOCSOC_CLICKHOUSE_HOST: clickhouse
       # Optional (ai profile). Without it AI endpoints answer 503.
       NOCSOC_AI_GATEWAY_URL: http://ai-gateway:8200
+      # Optional (workflow profile). Without it action requests and playbooks answer 503.
+      NOCSOC_TEMPORAL_ADDRESS: temporal:7233
     # File names carry the settings prefix: pydantic-settings maps NOCSOC_<FIELD> to them.
     secrets:
       - source: ai_gateway_token
         target: nocsoc_ai_gateway_token
+      - source: workflow_token
+        target: nocsoc_workflow_token
       - source: database_password
         target: nocsoc_database_password
       - source: auth_database_password
@@ -199,6 +203,48 @@ services:
       timeout: 5s
       retries: 6
       start_period: 5s
+    mem_limit: 256m
+
+  temporal:
+    <<: *hardening
+    profiles: [workflow]
+    networks: [workflow]
+    # Temporal CLI dev server 1.4.1 with SQLite persistence (dev only; docs/reports/P5-exit-review.md)
+    image: temporalio/temporal@sha256:9844298258519ebece82b3253f1ee1fc4eb8d87b7abcc264cfb676be342c74a5
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--headless", "--db-filename", "/home/temporal/temporal.db"]
+    volumes:
+      # Mounted on the image-owned home so a new volume inherits uid 1000 (temporal).
+      - temporaldata:/home/temporal
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "127.0.0.1:7233"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    mem_limit: 512m
+
+  workflow-worker:
+    <<: *hardening
+    profiles: [workflow]
+    networks: [workflow]
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/workflow-worker.Dockerfile
+      secrets: [build_extra_ca]
+    image: nocsoc/workflow-worker:dev
+    environment:
+      NOCSOC_API_URL: http://api:8000
+      NOCSOC_TEMPORAL_ADDRESS: temporal:7233
+    # Only the workflow token: no database, bus, valkey or AI credentials.
+    secrets:
+      - source: workflow_token
+        target: nocsoc_workflow_token
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    depends_on:
+      temporal: { condition: service_healthy }
+      api: { condition: service_healthy }
     mem_limit: 256m
 
   web:
@@ -394,6 +440,8 @@ secrets:
     file: ../secrets/clickhouse_reader_password
   ai_gateway_token:
     file: ../secrets/ai_gateway_token
+  workflow_token:
+    file: ../secrets/workflow_token
 
 # Segmentation (threat model T13, SEC-CON-02): the connector runner reaches only the API and
 # the event bus. Data stores sit on `data`, which the runner is not attached to.
@@ -406,8 +454,12 @@ networks:
   frontend:
   ai:
     internal: true
+  # Temporal, the workflow worker and the API. The worker has no route to the data stores.
+  workflow:
+    internal: true
 
 volumes:
+  temporaldata:
   pgdata:
   redpandadata:
   clickhousedata:

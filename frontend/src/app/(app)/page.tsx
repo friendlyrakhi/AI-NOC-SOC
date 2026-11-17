@@ -9,6 +9,8 @@ export default async function Home() {
   const first = PORTALS.find((p) => me.portals.includes(p.id));
   if (first) redirect(first.href);
   if (me.is_platform_admin) redirect("/admin/platform");
+  // Approvers may hold no portal at all: their work is the approvals inbox.
+  if (me.permissions.includes("action:approve")) redirect("/automation/approvals");
   return (
     <>
       <PageHeader title="No portal available" />

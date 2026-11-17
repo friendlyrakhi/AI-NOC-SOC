@@ -12,7 +12,7 @@ Every route declares exactly one marker, which the route-permission coverage tes
 
 import hmac
 import ipaddress
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import Depends, Request
@@ -184,14 +184,20 @@ def public() -> dict[str, Any]:
     return {"openapi_extra": {"x-required-permission": PUBLIC}}
 
 
-def internal() -> dict[str, Any]:
+def internal(which: Literal["runner", "workflow"] = "runner") -> dict[str, Any]:
+    """Service-to-service endpoints for the connector-runner (``X-Runner-Token``, setting
+    ``runner_token``) or the workflow worker (``X-Workflow-Token``, setting ``workflow_token``)."""
+
     async def check(request: Request, services: Services = Depends(get_services)) -> None:
-        expected = services.settings.runner_token
+        expected = services.settings.runner_token if which == "runner" else services.settings.workflow_token
         if expected is None:
-            raise ProblemError(503, "internal.disabled", "Runner endpoints disabled", "No runner token is configured.")
-        presented = request.headers.get("x-runner-token", "")
+            raise ProblemError(
+                503, "internal.disabled", "Internal endpoints disabled", "No service token is configured."
+            )
+        header = f"x-{which}-token"
+        presented = request.headers.get(header, "")
         if not hmac.compare_digest(presented.encode(), expected.get_secret_value().encode()):
-            raise unauthorized("A valid runner token is required.")
+            raise unauthorized("A valid service token is required.")
 
     return {
         "dependencies": [Depends(check)],

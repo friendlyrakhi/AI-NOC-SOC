@@ -30,6 +30,21 @@ class Services:
     _reader: Any = field(default=None, repr=False)
     # httpx transport for the AI gateway client; tests inject an in-process gateway here.
     ai_transport: Any = field(default=None, repr=False)
+    _temporal: Any = field(default=None, repr=False)
+    _temporal_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+
+    async def temporal(self) -> Any:
+        """Temporal client, connected on first use. None when automation is not configured."""
+        if not self.settings.temporal_address:
+            return None
+        async with self._temporal_lock:
+            if self._temporal is None:
+                from temporalio.client import Client
+
+                self._temporal = await Client.connect(
+                    self.settings.temporal_address, namespace=self.settings.temporal_namespace
+                )
+        return self._temporal
 
     async def analytics_reader(self) -> Any:
         """ClickHouse client as ``nocsoc_reader`` (row policies). None when not configured."""

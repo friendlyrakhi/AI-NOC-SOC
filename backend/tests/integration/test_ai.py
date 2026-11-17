@@ -81,7 +81,9 @@ def test_incident_summary_is_grounded_and_uses_runbooks(ai: StreamEnv) -> None:
     assert run["validation_status"] == "grounded" and run["output"]["claims"]
     types = {e["type"] for e in run["evidence"]}
     assert {"incident", "alert", "runbook"} <= types
-    assert any(e["type"] == "runbook" and "Core network outage" in e["title"] for e in run["evidence"])
+    assert any(e["type"] == "runbook" and "Core network outage" in e["title"] for e in run["evidence"]), [
+        (e["type"], e["title"]) for e in run["evidence"]
+    ]
     with ai.env.su() as c:
         cites = c.execute("SELECT count(*) FROM ai_citations WHERE ai_run_id = %s", (run["id"],)).fetchone()[0]
     assert cites >= len(run["output"]["claims"])

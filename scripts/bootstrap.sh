@@ -15,7 +15,7 @@ done
 
 umask 077
 mkdir -p infrastructure/secrets infrastructure/certs
-for name in postgres_password database_password auth_database_password valkey_password master_key worker_database_password runner_token clickhouse_admin_password clickhouse_ingest_password clickhouse_reader_password ai_gateway_token; do
+for name in postgres_password database_password auth_database_password valkey_password master_key worker_database_password runner_token clickhouse_admin_password clickhouse_ingest_password clickhouse_reader_password ai_gateway_token workflow_token; do
   f="infrastructure/secrets/$name"
   if [[ -f "$f" && $rotate -eq 0 ]]; then
     echo "==> secret $name exists (kept)"

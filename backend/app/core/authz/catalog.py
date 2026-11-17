@@ -63,6 +63,7 @@ PERMISSIONS: dict[str, str] = {
     "action:read": "View actions",
     "action:request": "Request actions",
     "action:approve": "Approve or deny actions",
+    "action:policy": "Change tenant action policies (tiers, allowed actions)",
     "playbook:read": "View playbooks",
     "playbook:edit": "Edit playbooks",
     "playbook:publish": "Publish playbooks",
@@ -93,6 +94,7 @@ PRIVILEGED: frozenset[str] = frozenset(
         "ai:admin",
         "knowledge:publish",
         "action:approve",
+        "action:policy",
         "playbook:publish",
         "automation:killswitch",
     }

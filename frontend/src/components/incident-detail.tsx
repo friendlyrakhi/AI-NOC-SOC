@@ -18,6 +18,9 @@ import {
 } from "@/app/actions/incidents";
 import type { Me } from "@/lib/server/api";
 import { AiPanel } from "@/components/ai-panel";
+import { RequestActionForm, RequestsTable } from "@/components/automation";
+import { runPlaybook } from "@/app/actions/automation";
+import type { IncidentAutomation } from "@/lib/server/automation";
 import type { AiRun, IncidentOut, IncidentTask, LinkedAlert, TimelineEntry } from "@/lib/server/pipeline";
 import { formatTime, minutes } from "@/lib/format";
 
@@ -87,6 +90,12 @@ function describe(e: TimelineEntry): string {
       return `Task "${s("title")}" is ${s("status").replace("_", " ")}.`;
     case "assignment":
       return "Assignment changed.";
+    case "action_requested":
+      return `Action requested: ${s("action")} (${s("tier")}, ${s("mode").replace("_", " ")}) by ${s("by") === "ai" ? "an AI suggestion" : s("by")}. Policy: ${s("decision").replace("_", " ")}.`;
+    case "approval":
+      return `${s("decision") === "approve" ? "Approved" : "Denied"} ${s("action")} (${s("approvals")} of ${s("required")})${b.comment ? `: ${s("comment")}` : ""}. Now ${s("status").replace("_", " ")}.`;
+    case "action_result":
+      return `${s("action")}: ${s("status").replace("_", " ")}${b.mode === "dry_run" ? " (dry-run preview)" : b.status === "succeeded" || b.status === "failed" ? " (simulated)" : ""}${b.detail ? `. ${s("detail")}` : ""}`;
     case "external_sync":
       return `ServiceNow ${s("number")} ${b.direction === "outbound" ? "← platform" : "→ platform"}: ${s("state")}${b.simulated ? " (simulated)" : ""}${b.applied === false ? " (recorded, no change)" : ""}`;
     default:
@@ -101,8 +110,10 @@ export function IncidentDetail({
   timeline,
   tasks,
   aiRuns,
+  automation,
 }: {
   me: Me;
+  automation: IncidentAutomation;
   aiRuns: AiRun[];
   incident: IncidentOut;
   alerts: LinkedAlert[];
@@ -207,6 +218,76 @@ export function IncidentDetail({
     ),
   };
 
+  const open = i.status !== "closed";
+  const requestable = can("action:request") && open && automation.catalog ? automation.catalog : null;
+  const runnable =
+    can("playbook:run") && open
+      ? (automation.playbooks ?? []).filter((p) => p.published_version != null && (p.domain === i.domain || p.domain === "joint" || i.domain === "joint"))
+      : [];
+  const actionsTab = {
+    label: "Actions",
+    count: (automation.requests?.length ?? 0) + (automation.runs?.length ?? 0),
+    content: (
+      <div className="space-y-6">
+        <p className="text-muted text-xs">
+          Actions run through the policy engine: T0/T1 run automatically, T2 needs one approver, T3 two different approvers. Execution is simulated or
+          a dry-run preview through sandbox connectors; live execution is disabled.
+        </p>
+        {automation.runs && automation.runs.length > 0 && (
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">Playbook runs</h3>
+            <ul className="space-y-1 text-sm">
+              {automation.runs.map((r) => (
+                <li key={r.id} className="flex flex-wrap items-center gap-2">
+                  <StateBadge value={r.status} />
+                  <Link href={`/automation/runs/${r.id}`} className="text-primary hover:underline">
+                    {r.playbook_name} v{r.version}
+                  </Link>
+                  <span className="text-muted text-xs">
+                    {r.mode === "dry_run" ? "dry run" : "simulate"} · {formatTime(r.started_at)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {automation.requests && <RequestsTable requests={automation.requests} caption="Action requests for this incident" />}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {requestable && (
+            <div>
+              <h3 className="mb-2 text-sm font-semibold">Request an action</h3>
+              <RequestActionForm catalog={requestable} incidentId={i.id} />
+            </div>
+          )}
+          {runnable.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-sm font-semibold">Run a playbook</h3>
+              <ActionForm action={runPlaybook} submitLabel="Start playbook">
+                <input type="hidden" name="incident_id" value={i.id} />
+                <Field label="Playbook">
+                  <select name="playbook_id" required className="input mt-1 w-full">
+                    {runnable.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} (v{p.published_version}, up to {p.max_tier})
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Mode">
+                  <select name="mode" defaultValue="dry_run" className="input mt-1 w-full">
+                    <option value="dry_run">Dry run: preview every step</option>
+                    <option value="simulate">Simulate: sandbox connectors</option>
+                  </select>
+                </Field>
+              </ActionForm>
+            </div>
+          )}
+        </div>
+      </div>
+    ),
+  };
+  const tabs = automation.catalog || automation.playbooks ? [timelineTab, alertsTab, tasksTab, actionsTab] : [timelineTab, alertsTab, tasksTab];
+
   return (
     <>
       <p className="mb-2 text-xs">
@@ -238,7 +319,7 @@ export function IncidentDetail({
 
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
         <div className="xl:col-span-2">
-          <Tabs tabs={[timelineTab, alertsTab, tasksTab]} />
+          <Tabs tabs={tabs} />
         </div>
         <div className="space-y-6">
           <Card title="SLA">
@@ -329,7 +410,7 @@ export function IncidentDetail({
       </div>
       {(me.permissions.includes("ai:use") || aiRuns.length > 0) && (
         <div className="mt-6">
-          <AiPanel incidentId={i.id} runs={aiRuns} canUse={me.permissions.includes("ai:use") && i.status !== "closed"} />
+          <AiPanel incidentId={i.id} runs={aiRuns} canUse={me.permissions.includes("ai:use") && i.status !== "closed"} requestable={requestable} />
         </div>
       )}
       <SectionTitle>Summary</SectionTitle>

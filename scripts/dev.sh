@@ -11,7 +11,7 @@ cmd="${1:-status}"; shift || true
 
 profile_args() {
   local p; local -a out=()
-  if [[ $# -eq 0 ]]; then set -- core stream ai; fi  # P4 default; `up core` for a lighter stack
+  if [[ $# -eq 0 ]]; then set -- core stream ai workflow; fi  # P5 default; `up core` for a lighter stack
   for p in "$@"; do out+=(--profile "$p"); done
   printf '%s\n' "${out[@]}"
 }
@@ -38,7 +38,20 @@ case "$cmd" in
   seed)
     out=infrastructure/secrets/dev-users.json
     json=$("${compose[@]}" --profile core run --rm -T migrate python -m app.db.seed 2>/dev/null)
-    if grep -q already_seeded <<<"$json"; then echo "Already seeded. Credentials are in $out"; exit 0; fi
+    if grep -q already_seeded <<<"$json"; then
+      # Merge users added by later phases (e.g. P5 approvers) into the credentials file.
+      python3 - "$out" "$json" <<'PY'
+import json, sys
+path, data = sys.argv[1], json.loads(sys.argv[2])
+new = data.get("new_users") or []
+if new:
+    current = json.load(open(path, encoding="utf-8"))
+    current["users"] = current.get("users", []) + new
+    json.dump(current, open(path, "w", encoding="utf-8"), indent=2)
+    print(f"added {len(new)} new seed user(s) to {path}")
+PY
+      echo "Already seeded. Credentials are in $out"; exit 0
+    fi
     (umask 077; printf '%s
 ' "$json" > "$out")
     echo "seeded; credentials written to $out (git-ignored, mock data only)" ;;

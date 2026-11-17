@@ -7,6 +7,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import __version__, errors
+from app.actions.internal import router as workflow_internal_router
+from app.actions.router import router as actions_router
 from app.ai.knowledge import router as knowledge_router
 from app.ai.router import router as ai_router
 from app.alerts.router import router as alerts_router
@@ -72,6 +74,8 @@ def create_app(settings: Settings | None = None, *, mailer: Mailer | None = None
         live_router,
         ai_router,
         knowledge_router,
+        actions_router,
+        workflow_internal_router,
         events_router,
         internal_router,
     ):

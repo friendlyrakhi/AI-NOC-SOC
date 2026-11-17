@@ -2,7 +2,7 @@
 .SYNOPSIS
   Runs the local stack.
 .EXAMPLE
-  scripts\dev.ps1 up                     # core + stream + ai profiles (P4 default)
+  scripts\dev.ps1 up                     # core + stream + ai + workflow profiles (P5 default)
   scripts\dev.ps1 up -Profiles core      # without ingestion (lighter: no Redpanda/ClickHouse)
   scripts\dev.ps1 up -Build
   scripts\dev.ps1 status                 # containers + memory use
@@ -17,7 +17,7 @@ param(
     [Parameter(Position = 0)][ValidateSet('up', 'down', 'reset', 'logs', 'status', 'build', 'seed', 'totp', 'migrate')]
     [string]$Command = 'status',
     [Parameter(Position = 1)][string]$Service,
-    [string[]]$Profiles = @('core', 'stream', 'ai'),
+    [string[]]$Profiles = @('core', 'stream', 'ai', 'workflow'),
     [switch]$Build,
     [switch]$Force
 )
@@ -68,7 +68,19 @@ switch ($Command) {
         $json = & docker @compose @profileArgs run --rm -T migrate python -m app.db.seed 2>$null
         if ($LASTEXITCODE -ne 0) { throw 'seed failed; run scripts\dev.ps1 up first' }
         $text = ($json -join "`n")
-        if ($text -match '"already_seeded"') { Write-Host 'Already seeded. Credentials are in' $out; return }
+        if ($text -match '"already_seeded"') {
+            # Users added by later phases (e.g. P5 approvers) are created now; merge their credentials.
+            $added = @(($text | ConvertFrom-Json).new_users)
+            if ($added.Count -gt 0 -and (Test-Path $out)) {
+                $existing = Get-Content $out -Raw | ConvertFrom-Json
+                $existing.users = @($existing.users) + $added
+                [System.IO.File]::WriteAllText($out, ($existing | ConvertTo-Json -Depth 6))
+                Write-Step "added $($added.Count) new seed user(s) to $out"
+                $added | Select-Object email, tenant, @{n = 'roles'; e = { $_.roles -join ',' } } | Format-Table -AutoSize
+            }
+            Write-Host 'Already seeded. Credentials are in' $out
+            return
+        }
         [System.IO.File]::WriteAllText($out, $text)
         Write-Step "seeded; credentials written to $out (git-ignored, mock data only)"
         $users = ($text | ConvertFrom-Json).users

@@ -51,9 +51,17 @@ TENANT_SCOPED = {
     "ai_feedback",
     "knowledge_docs",
     "knowledge_chunks",
+    # P5 automation
+    "action_policies",
+    "playbooks",
+    "playbook_versions",
+    "workflow_runs",
+    "action_requests",
+    "approvals",
+    "tenant_kill_switches",
 }
 IDENTITY_ONLY = {"user_credentials", "sessions", "auth_challenges", "invitations"}  # no app policies
-GLOBAL = {"permissions", "alembic_version"}
+GLOBAL = {"permissions", "alembic_version", "global_kill_switch"}
 WORKER_ONLY = {"ingest_seen"}  # the app role has no grant at all
 AGGREGATE_READABLE = {"tenants", "audit_log", "alerts", "assets", "vuln_findings", "incidents", "services"}
 
