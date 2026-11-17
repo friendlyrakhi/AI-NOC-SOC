@@ -21,6 +21,7 @@ from app.core.authz.deps import get_principal, requires
 from app.core.authz.principal import Principal
 from app.core.cache import cached_json, invalidate, tenant_key
 from app.core.tenancy.common import record, tenant_tx
+from app.core.types import StrictInt
 from app.errors import ProblemError, not_found
 from app.services import Services, get_services
 
@@ -95,7 +96,7 @@ class AlertPage(BaseModel):
 
 class AlertTransition(BaseModel):
     status: AlertStatus
-    version: int = Field(ge=1)
+    version: StrictInt = Field(ge=1)
     note: str | None = Field(default=None, max_length=1000)
 
 

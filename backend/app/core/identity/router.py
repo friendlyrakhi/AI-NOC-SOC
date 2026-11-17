@@ -15,7 +15,9 @@ from app.core.authz import service as authz
 from app.core.authz.catalog import portals_for
 from app.core.authz.deps import authenticated, client_ip, get_principal, get_session, public
 from app.core.authz.principal import Principal
+from app.core.identity.oidc import OidcService
 from app.core.identity.service import IdentityService, SessionInfo
+from app.core.types import StrictBool
 from app.errors import unauthorized
 from app.services import Services, get_services
 
@@ -72,7 +74,7 @@ class AcceptInvitationResponse(BaseModel):
 
 class SwitchTenantRequest(BaseModel):
     tenant_id: UUID
-    aggregate: bool = False
+    aggregate: StrictBool = False
 
 
 class TenantAccessOut(BaseModel):
@@ -98,6 +100,8 @@ class MeResponse(BaseModel):
     permissions: list[str]
     portals: list[str]
     step_up_active: bool
+    # Privileged permissions held but unusable in this session (not established with MFA).
+    withheld_permissions: list[str] = []
 
 
 @router.post("/login", response_model=LoginResponse, **public())
@@ -196,4 +200,51 @@ async def me(
         permissions=sorted(principal.permissions),
         portals=portals_for(principal.permissions),
         step_up_active=principal.stepped_up(services.settings.step_up_minutes),
+        withheld_permissions=sorted(principal.withheld),
     )
+
+
+# ---------------------------------------------------------------------- optional OIDC sign-in (P7)
+class OidcConfigOut(BaseModel):
+    enabled: bool
+    display_name: str
+
+
+class OidcStartOut(BaseModel):
+    authorization_url: str
+
+
+class OidcCallbackIn(BaseModel):
+    code: str = Field(min_length=1, max_length=4096)
+    state: str = Field(min_length=16, max_length=256)
+
+
+async def _oidc_rate(services: Services, request: Request, step: str) -> None:
+    from app.errors import ProblemError
+    from app.ratelimit import login_ip_key
+
+    if await services.limiter.hit(f"{login_ip_key(client_ip(request) or '-')}:oidc:{step}", 60) > 30:
+        raise ProblemError(429, "rate_limited", "Too many requests", "Wait a minute and try again.")
+
+
+@router.get("/oidc/config", response_model=OidcConfigOut, **public())
+async def oidc_config(services: Annotated[Services, Depends(get_services)]) -> OidcConfigOut:
+    svc = OidcService(services)
+    return OidcConfigOut(enabled=svc.enabled, display_name=services.settings.oidc_display_name)
+
+
+@router.post("/oidc/start", response_model=OidcStartOut, **public())
+async def oidc_start(request: Request, services: Annotated[Services, Depends(get_services)]) -> OidcStartOut:
+    await _oidc_rate(services, request, "start")
+    return OidcStartOut(authorization_url=await OidcService(services).start())
+
+
+@router.post("/oidc/callback", response_model=SessionResponse, **public())
+async def oidc_callback(
+    body: OidcCallbackIn, request: Request, services: Annotated[Services, Depends(get_services)]
+) -> SessionResponse:
+    await _oidc_rate(services, request, "callback")
+    result = await OidcService(services).callback(
+        body.code, body.state, client_ip(request), request.headers.get("user-agent")
+    )
+    return SessionResponse(session_token=result.session_token)

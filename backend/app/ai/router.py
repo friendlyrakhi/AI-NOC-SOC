@@ -18,6 +18,7 @@ from app.ai import client, service
 from app.core.authz.deps import get_principal, requires
 from app.core.authz.principal import Principal
 from app.core.tenancy.common import record, tenant_tx
+from app.core.types import StrictBool, StrictInt
 from app.errors import forbidden, not_found
 from app.services import Services, get_services
 
@@ -173,10 +174,10 @@ class AiSettingsOut(BaseModel):
 
 class AiSettingsIn(BaseModel):
     provider: Literal["mock", "ollama", "anthropic"]
-    allow_cloud: bool = False
-    redact_pii: bool = True
-    daily_token_budget: int = Field(default=200_000, ge=0, le=100_000_000)
-    auto_summarize: bool = False
+    allow_cloud: StrictBool = False
+    redact_pii: StrictBool = True
+    daily_token_budget: StrictInt = Field(default=200_000, ge=0, le=100_000_000)
+    auto_summarize: StrictBool = False
 
     @model_validator(mode="after")
     def _cloud(self) -> AiSettingsIn:

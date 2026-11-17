@@ -19,6 +19,7 @@ from app.ai import client, evidence
 from app.ai.actions import allowed_for
 from app.ai.validator import Validated, validate
 from app.core.authz.principal import Principal
+from app.core.cache import tenant_key
 from app.core.tenancy.common import record, tenant_tx
 from app.errors import ProblemError
 from app.services import Services
@@ -55,6 +56,22 @@ async def tokens_today(conn: AsyncConnection) -> int:
     return int(used)
 
 
+async def per_user_limit(services: Services, p: Principal) -> None:
+    """Per-user hourly cap on AI requests (P4 residual), on top of the tenant's token budget."""
+    caller = p.user_id or p.api_key_id
+    if caller is None:
+        return
+    window = int(datetime.now(UTC).timestamp() // 3600)
+    key = tenant_key(p.tenant_id, "ai", "user", str(caller), str(window))
+    if await services.limiter.hit(key, 3600) > services.settings.ai_requests_per_user_hour:
+        raise ProblemError(
+            429,
+            "ai.rate_limited",
+            "Too many AI requests",
+            "You have reached the hourly limit for AI requests. Try again later.",
+        )
+
+
 async def run(
     services: Services,
     p: Principal,
@@ -64,6 +81,7 @@ async def run(
     subject_id: UUID | None,
     question: str | None = None,
 ) -> dict[str, Any]:
+    await per_user_limit(services, p)
     async with tenant_tx(services, p) as conn:
         cfg = await load_settings(conn)
         if await tokens_today(conn) >= cfg.daily_token_budget:

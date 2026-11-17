@@ -24,7 +24,7 @@ function New-HexSecret([int]$Bytes = 32) {
     return -join ($buf | ForEach-Object { $_.ToString('x2') })
 }
 
-foreach ($name in 'postgres_password', 'database_password', 'auth_database_password', 'valkey_password', 'master_key', 'worker_database_password', 'runner_token', 'clickhouse_admin_password', 'clickhouse_ingest_password', 'clickhouse_reader_password', 'ai_gateway_token', 'workflow_token') {
+foreach ($name in 'postgres_password', 'database_password', 'auth_database_password', 'valkey_password', 'master_key', 'worker_database_password', 'runner_token', 'clickhouse_admin_password', 'clickhouse_ingest_password', 'clickhouse_reader_password', 'ai_gateway_token', 'workflow_token', 'audit_anchor_key', 'grafana_admin_password', 'oidc_client_secret', 'sso_demo_password', 'keycloak_admin_password') {
     $path = Join-Path $secretsDir $name
     if ((Test-Path $path) -and -not $RotateSecrets) {
         Write-Step "secret $name exists (kept)"
@@ -103,6 +103,14 @@ if (-not $SkipInstall) {
         Write-Step 'pnpm install (frontend)'
         Invoke-Checked pnpm install --frozen-lockfile
     } finally { Pop-Location }
+}
+
+# TLS certificates for the hardened profile (P7): local dev CA + one certificate per service.
+$python = Join-Path $root '.venv\Scripts\python.exe'
+if (Test-Path $python) {
+    Invoke-Checked $python (Join-Path $PSScriptRoot 'certs.py')
+} else {
+    Write-Step 'certificates skipped (no Python environment yet): run scripts\certs.py after uv sync'
 }
 
 Write-Host ''

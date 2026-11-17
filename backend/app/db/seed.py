@@ -19,7 +19,7 @@ from sqlalchemy import Connection, create_engine, text
 
 from app.config import Settings, get_settings
 from app.core.authz.catalog import PRIVILEGED, SYSTEM_ROLES
-from app.core.secrets import LocalEnvelopeProvider
+from app.core.secrets import SecretsProvider, build_provider
 from app.core.security import hash_password, new_totp_secret
 
 
@@ -103,7 +103,7 @@ def _password() -> str:
     return "Dev-" + secrets.token_urlsafe(12)
 
 
-def _create_user(conn: Connection, envelope: LocalEnvelopeProvider, user: SeedUser) -> dict[str, object]:
+def _create_user(conn: Connection, envelope: SecretsProvider, user: SeedUser) -> dict[str, object]:
     user_id = conn.execute(
         text(
             "INSERT INTO users (email, display_name, status, is_platform_admin) "
@@ -139,9 +139,7 @@ def _audit(conn: Connection, tenant_id: object, action: str, details: dict[str, 
 def seed(settings: Settings) -> list[dict[str, object]] | None:
     if settings.environment != "dev":
         raise SystemExit("seeding is only allowed in the dev environment")
-    if settings.master_key is None:
-        raise SystemExit("missing secret: master_key")
-    envelope = LocalEnvelopeProvider(settings.master_key.get_secret_value())
+    envelope = build_provider(settings)
     engine = create_engine(settings.superuser_database_url())
     out: list[dict[str, object]] = []
     try:
@@ -295,9 +293,7 @@ def seed_missing_users(settings: Settings) -> list[dict[str, object]]:
     dev database. Returns their credentials (only for users created now)."""
     if settings.environment != "dev":
         raise SystemExit("seeding is only allowed in the dev environment")
-    if settings.master_key is None:
-        raise SystemExit("missing secret: master_key")
-    envelope = LocalEnvelopeProvider(settings.master_key.get_secret_value())
+    envelope = build_provider(settings)
     engine = create_engine(settings.superuser_database_url())
     out: list[dict[str, object]] = []
     try:

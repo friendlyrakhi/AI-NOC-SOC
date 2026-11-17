@@ -71,6 +71,8 @@ class SessionInfo:
     active_tenant_id: UUID | None
     aggregate: bool
     step_up_at: datetime | None
+    # Established (or stepped up) with a second factor; privileged permissions need it.
+    mfa: bool = False
 
 
 @dataclass(frozen=True)
@@ -105,17 +107,18 @@ class IdentityService:
         return f"totp:{user_id}"
 
     async def _create_session(
-        self, conn: AsyncConnection, user_id: UUID, ip: str | None, user_agent: str | None
+        self, conn: AsyncConnection, user_id: UUID, ip: str | None, user_agent: str | None, *, mfa: bool
     ) -> str:
         access = await authz.accessible_tenants(conn, user_id)
         active = next((a for a in access if a.access == "member"), access[0] if access else None)
         token = new_token(SESSION_PREFIX)
         await conn.execute(
             text(
-                "INSERT INTO sessions (token_hash, user_id, active_tenant_id, expires_at, ip, user_agent) "
-                "VALUES (:h, :u, :t, now() + make_interval(hours => :ttl), CAST(:ip AS inet), :ua)"
+                "INSERT INTO sessions (token_hash, user_id, active_tenant_id, expires_at, ip, user_agent, mfa) "
+                "VALUES (:h, :u, :t, now() + make_interval(hours => :ttl), CAST(:ip AS inet), :ua, :mfa)"
             ),
             {
+                "mfa": mfa,
                 "h": token_hash(token),
                 "u": user_id,
                 "t": active.tenant_id if active else None,
@@ -232,7 +235,8 @@ class IdentityService:
                     )
                 else:
                     outcome = LoginOutcome(
-                        "authenticated", session_token=await self._create_session(conn, user.id, ip, user_agent)
+                        "authenticated",
+                        session_token=await self._create_session(conn, user.id, ip, user_agent, mfa=False),
                     )
                 await audit.append(
                     conn,
@@ -287,7 +291,7 @@ class IdentityService:
                         {"s": step, "u": ch.user_id},
                     )
                     await conn.execute(text("UPDATE auth_challenges SET used_at = now() WHERE id = :id"), {"id": ch.id})
-                    session_token = await self._create_session(conn, ch.user_id, ip, user_agent)
+                    session_token = await self._create_session(conn, ch.user_id, ip, user_agent, mfa=True)
                     await audit.append(conn, tenant_id=None, actor=actor, action="auth.mfa", outcome="success")
         if error or session_token is None:
             raise error or _challenge_invalid()
@@ -337,7 +341,7 @@ class IdentityService:
                         },
                     )
                     await conn.execute(text("UPDATE auth_challenges SET used_at = now() WHERE id = :id"), {"id": ch.id})
-                    session_token = await self._create_session(conn, ch.user_id, ip, user_agent)
+                    session_token = await self._create_session(conn, ch.user_id, ip, user_agent, mfa=True)
                     await audit.append(conn, tenant_id=None, actor=actor, action="auth.mfa.enroll", outcome="success")
         if error or session_token is None:
             raise error or _challenge_invalid()
@@ -370,7 +374,8 @@ class IdentityService:
                         {"s": step, "u": session.user_id},
                     )
                     await conn.execute(
-                        text("UPDATE sessions SET step_up_at = now() WHERE id = :id"), {"id": session.id}
+                        text("UPDATE sessions SET step_up_at = now(), mfa = true WHERE id = :id"),
+                        {"id": session.id},
                     )
                     await audit.append(conn, tenant_id=None, actor=actor, action="auth.step_up", outcome="success")
         if error:
@@ -384,7 +389,7 @@ class IdentityService:
             row = (
                 await conn.execute(
                     text(
-                        "SELECT s.id, s.user_id, s.active_tenant_id, s.aggregate, s.step_up_at, "
+                        "SELECT s.id, s.user_id, s.active_tenant_id, s.aggregate, s.step_up_at, s.mfa, "
                         "s.last_seen_at, u.email::text AS email, u.is_platform_admin "
                         "FROM sessions s JOIN users u ON u.id = s.user_id "
                         "WHERE s.token_hash = :h AND s.revoked_at IS NULL AND s.expires_at > now() "
@@ -405,6 +410,7 @@ class IdentityService:
             active_tenant_id=row.active_tenant_id,
             aggregate=row.aggregate,
             step_up_at=row.step_up_at,
+            mfa=row.mfa,
         )
 
     async def logout(self, session: SessionInfo, ip: str | None) -> None:

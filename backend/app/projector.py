@@ -25,6 +25,7 @@ from uuid import UUID
 
 from sqlalchemy import text
 
+from app import telemetry
 from app.db.engines import AppDatabase
 from app.incidents.sla import evaluate, merged_targets
 from app.searchstore import SearchStore, entity_document
@@ -151,9 +152,13 @@ class Projector:
         for tenant in tenants:
             for stream, sink in self._targets():
                 try:
-                    total += await self._project(tenant, stream, sink, resync=resync)
+                    rows = await self._project(tenant, stream, sink, resync=resync)
+                    total += rows
+                    if rows:
+                        telemetry.PROJECTOR_ROWS.add(rows, {"sink": sink, "stream": stream})
                 except Exception as exc:  # one tenant or sink must not stop the others
                     self.stats["failed"] += 1
+                    telemetry.PROJECTOR_FAILURES.add(1, {"sink": sink, "stream": stream})
                     logger.warning("projection failed (stream=%s sink=%s): %s", stream, sink, type(exc).__name__)
         self.stats["projected"] += total
         return total

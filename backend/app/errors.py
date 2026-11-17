@@ -12,6 +12,49 @@ logger = logging.getLogger(__name__)
 
 PROBLEM_JSON = "application/problem+json"
 
+# OpenAPI (P7): every error is an RFC 9457 problem document. The generated document describes
+# them, so clients and the API fuzzer can check error responses as strictly as successes.
+PROBLEM_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "title": "Problem",
+    "required": ["type", "title", "status", "code"],
+    "properties": {
+        "type": {"type": "string"},
+        "title": {"type": "string"},
+        "status": {"type": "integer"},
+        "detail": {"type": ["string", "null"]},
+        "instance": {"type": ["string", "null"]},
+        "code": {"type": "string", "description": "Stable machine-readable error code"},
+        "errors": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"loc": {"type": "array"}, "msg": {"type": "string"}, "type": {"type": "string"}},
+            },
+        },
+    },
+}
+
+
+def document_problems(schema: dict[str, Any]) -> dict[str, Any]:
+    """Replaces FastAPI's default 422 description and adds 4XX/503 problem responses everywhere."""
+    schema.setdefault("components", {}).setdefault("schemas", {})["Problem"] = PROBLEM_SCHEMA
+    for name in ("HTTPValidationError", "ValidationError"):
+        schema["components"]["schemas"].pop(name, None)
+    content = {PROBLEM_JSON: {"schema": {"$ref": "#/components/schemas/Problem"}}}
+    for item in schema.get("paths", {}).values():
+        for method, op in item.items():
+            if method not in {"get", "put", "post", "patch", "delete"}:
+                continue
+            responses = op.setdefault("responses", {})
+            responses["422"] = {"description": "Validation failed", "content": content}
+            responses.setdefault("4XX", {"description": "Problem details (RFC 9457)", "content": content})
+            responses.setdefault(
+                "503",
+                {"description": "A dependency is not configured or not reachable", "content": content},
+            )
+    return schema
+
 
 class ProblemError(Exception):
     def __init__(

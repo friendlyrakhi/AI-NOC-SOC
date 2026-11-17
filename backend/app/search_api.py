@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.core.authz.deps import get_principal, requires
 from app.core.authz.principal import Principal
 from app.core.cache import tenant_budget
+from app.core.types import StrictBool, StrictInt
 from app.errors import ProblemError
 from app.searchstore import (
     EventQuery,
@@ -87,8 +88,8 @@ class EventSearchIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query: EventQuery = Field(default_factory=EventQuery)
-    limit: int = Field(default=100, ge=1, le=500)
-    facets: bool = True
+    limit: StrictInt = Field(default=100, ge=1, le=500)
+    facets: StrictBool = True
 
 
 class EventHit(BaseModel):

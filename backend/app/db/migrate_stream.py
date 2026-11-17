@@ -10,7 +10,7 @@ import logging
 import clickhouse_connect
 from aiokafka.admin import AIOKafkaAdminClient, NewTopic
 
-from app.analytics import schema, users_and_policies
+from app.analytics import schema, tls_options, users_and_policies
 from app.config import Settings, get_settings
 from app.streaming import ALERTS_UPSERTED, DEAD_LETTER, raw_topic
 
@@ -73,6 +73,7 @@ def setup_clickhouse(settings: Settings) -> None:
                 port=settings.clickhouse_port,
                 username=settings.clickhouse_admin_user,
                 password=settings.clickhouse_admin_password.get_secret_value(),
+                **tls_options(settings),
             )
             break
         except Exception:

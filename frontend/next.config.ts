@@ -6,8 +6,7 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-  // Full nonce-based CSP lands with the BFF in P1 (threat model T2).
-  { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'" },
+  // The nonce-based Content-Security-Policy is set per request in src/proxy.ts (P7).
 ];
 
 const nextConfig: NextConfig = {

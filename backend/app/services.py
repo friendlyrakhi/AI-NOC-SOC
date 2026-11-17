@@ -9,7 +9,7 @@ from fastapi import Request
 
 from app.config import Settings
 from app.core.identity.authdb import AuthDatabase
-from app.core.secrets import LocalEnvelopeProvider, SecretsProvider
+from app.core.secrets import SecretsProvider, build_provider
 from app.db.engines import AppDatabase
 from app.mail import Mailer, SmtpMailer
 from app.ratelimit import RateLimiter
@@ -30,6 +30,8 @@ class Services:
     _reader: Any = field(default=None, repr=False)
     # httpx transport for the AI gateway client; tests inject an in-process gateway here.
     ai_transport: Any = field(default=None, repr=False)
+    # httpx transport for the OIDC identity provider; tests inject a fake IdP here.
+    oidc_transport: Any = field(default=None, repr=False)
     _temporal: Any = field(default=None, repr=False)
     _search: Any = field(default=None, repr=False)
     _temporal_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
@@ -42,8 +44,16 @@ class Services:
             if self._temporal is None:
                 from temporalio.client import Client
 
+                # Trace context travels in Temporal headers to the workflow worker (NFR-6).
+                interceptors: list[Any] = []
+                if self.settings.otel_enabled:
+                    from temporalio.contrib.opentelemetry import TracingInterceptor
+
+                    interceptors.append(TracingInterceptor())
                 self._temporal = await Client.connect(
-                    self.settings.temporal_address, namespace=self.settings.temporal_namespace
+                    self.settings.temporal_address,
+                    namespace=self.settings.temporal_namespace,
+                    interceptors=interceptors,
                 )
         return self._temporal
 
@@ -58,6 +68,7 @@ class Services:
                 self.settings.opensearch_url,
                 "nocsoc_reader",
                 self.settings.opensearch_reader_password.get_secret_value(),
+                verify=self.settings.tls_ca_file or True,
             )
         return self._search
 
@@ -94,22 +105,28 @@ class Services:
         await self.valkey.aclose()
 
 
-def build_services(settings: Settings, mailer: Mailer | None = None) -> Services:
-    if settings.master_key is None:
-        raise RuntimeError("master key secret (nocsoc_master_key) is required")
-    valkey = redis.Redis(
+def valkey_client(settings: Settings) -> redis.Redis:
+    """Valkey client; TLS with certificate verification in the hardened profile."""
+    tls: dict[str, Any] = {"ssl": True, "ssl_ca_certs": settings.tls_ca_file} if settings.valkey_tls else {}
+    return redis.Redis(
         host=settings.valkey_host,
         port=settings.valkey_port,
         password=settings.valkey_password.get_secret_value() if settings.valkey_password else None,
         socket_timeout=2,
+        **tls,
     )
+
+
+def build_services(settings: Settings, mailer: Mailer | None = None) -> Services:
+    secrets = build_provider(settings)
+    valkey = valkey_client(settings)
     return Services(
         settings=settings,
         app_db=AppDatabase(settings),
         auth_db=AuthDatabase(settings),
         valkey=valkey,
         limiter=RateLimiter(valkey),
-        secrets=LocalEnvelopeProvider(settings.master_key.get_secret_value()),
+        secrets=secrets,
         mailer=mailer or SmtpMailer(settings),
     )
 

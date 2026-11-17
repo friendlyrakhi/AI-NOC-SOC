@@ -25,6 +25,8 @@ from typing import Any, Literal
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.types import IsoDatetime
+
 logger = logging.getLogger(__name__)
 
 EventClass = Literal["alert", "detection", "authentication", "process", "network", "api_activity", "ticket"]
@@ -121,8 +123,8 @@ class EventQuery(BaseModel):
     actor_user: str | None = Field(default=None, max_length=200)
     ip: str | None = Field(default=None, max_length=45, description="Matches source or destination IP.")
     mitre: list[str] = Field(default_factory=list, max_length=10)
-    since: datetime | None = None
-    until: datetime | None = None
+    since: IsoDatetime | None = None
+    until: IsoDatetime | None = None
 
     @field_validator("mitre")
     @classmethod
@@ -237,9 +239,18 @@ class SearchUnavailableError(Exception):
 class SearchStore:
     """Thin async REST client. One instance per role (reader or indexer)."""
 
-    def __init__(self, url: str, user: str, password: str, *, transport: Any = None, timeout: float = 15) -> None:
+    def __init__(
+        self,
+        url: str,
+        user: str,
+        password: str,
+        *,
+        transport: Any = None,
+        timeout: float = 15,
+        verify: str | bool = True,
+    ) -> None:
         self.client = httpx.AsyncClient(
-            base_url=url.rstrip("/"), auth=(user, password), timeout=timeout, transport=transport
+            base_url=url.rstrip("/"), auth=(user, password), timeout=timeout, transport=transport, verify=verify
         )
 
     async def close(self) -> None:
@@ -386,10 +397,12 @@ ROLES = {
 }
 
 
-async def setup(url: str, admin_password: str, users: dict[str, str], *, transport: Any = None) -> None:
+async def setup(
+    url: str, admin_password: str, users: dict[str, str], *, transport: Any = None, verify: str | bool = True
+) -> None:
     """Idempotent: index templates, the retention policy, roles and the two service users."""
     async with httpx.AsyncClient(
-        base_url=url.rstrip("/"), auth=("admin", admin_password), timeout=30, transport=transport
+        base_url=url.rstrip("/"), auth=("admin", admin_password), timeout=30, transport=transport, verify=verify
     ) as c:
         (await c.put("/_index_template/nocsoc-events", json=EVENTS_TEMPLATE)).raise_for_status()
         (await c.put("/_index_template/nocsoc-entities", json=ENTITIES_TEMPLATE)).raise_for_status()

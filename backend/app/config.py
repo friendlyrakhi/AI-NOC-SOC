@@ -51,12 +51,14 @@ class Settings(BaseSettings):
     valkey_host: str = "valkey"
     valkey_port: int = 6379
     valkey_password: SecretStr | None = None
+    valkey_tls: bool = False
 
     # --- Streaming (Kafka API: Redpanda in dev). Optional: features return 503 without it.
     kafka_bootstrap: str | None = None
     # --- Analytics (ClickHouse). Optional.
     clickhouse_host: str | None = None
     clickhouse_port: int = 8123
+    clickhouse_secure: bool = False  # hardened profile: HTTPS (port 8443)
     clickhouse_database: str = "nocsoc"
     clickhouse_admin_user: str = "nocsoc_admin"
     clickhouse_admin_password: SecretStr | None = None
@@ -71,6 +73,10 @@ class Settings(BaseSettings):
     opensearch_admin_password: SecretStr | None = None
     # Analytics projector (P6): Postgres state -> ClickHouse facts and the OpenSearch entity index.
     projector_interval_seconds: float = Field(default=5.0, gt=0, le=3600)
+    # Telemetry outbox (P7): undelivered ClickHouse/OpenSearch rows are retried at this interval and
+    # dropped (with a warning) after the maximum age; raw records stay replayable from the bus.
+    telemetry_outbox_interval_seconds: float = Field(default=5.0, gt=0, le=3600)
+    telemetry_outbox_max_age_hours: int = Field(default=72, ge=1, le=720)
     # Hunts run asynchronously; per tenant at most this many at once and per hour.
     hunt_max_concurrent: int = Field(default=2, ge=1, le=20)
     hunt_runs_per_hour: int = Field(default=60, ge=1, le=10_000)
@@ -89,6 +95,35 @@ class Settings(BaseSettings):
 
     # --- Secrets (envelope encryption master key, 32 bytes hex) ---
     master_key: SecretStr | None = None
+    # P7 hardened profile: data keys from OpenBao Transit (AppRole credentials written by the
+    # one-shot openbao-setup job). With a master key still configured, v1 values stay readable.
+    secrets_provider: Literal["local", "openbao"] = "local"
+    openbao_url: str | None = None
+    openbao_approle_dir: str = "/run/openbao"
+    openbao_transit_key: str = "nocsoc-master"
+    # CA bundle for TLS between services (hardened profile); None = plain connections (dev).
+    tls_ca_file: str | None = None
+
+    # --- Audit anchors (P7, threat model T28): signed chain heads outside the database. Only the
+    # audit-anchor service (and the one-shot verifier) hold this key and mount the anchor volume.
+    audit_anchor_key: SecretStr | None = None
+    audit_anchor_path: str = "/var/lib/nocsoc/anchors/audit-anchors.jsonl"
+    audit_anchor_interval_seconds: float = Field(default=300.0, gt=0, le=86_400)
+    audit_anchor_heartbeat_seconds: float = Field(default=3600.0, gt=0, le=86_400)
+
+    # --- Optional OIDC sign-in (P7, D7): Keycloak (`sso` profile) or Entra ID. Users must already
+    # exist (matched by verified e-mail). Discovery and token calls use the internal URL; the issuer
+    # is what the IdP puts in its tokens (its public URL).
+    oidc_enabled: bool = False
+    oidc_display_name: str = "Single sign-on"
+    oidc_issuer: str | None = None
+    oidc_discovery_url: str | None = None
+    oidc_client_id: str = "nocsoc-web"
+    oidc_client_secret: SecretStr | None = None
+    oidc_redirect_uri: str = "http://127.0.0.1:3000/login/sso/callback"
+    # A session is MFA when the ID token's amr has one of these, or the IdP enforces MFA for everyone.
+    oidc_mfa_amr: list[str] = Field(default_factory=lambda: ["otp", "mfa", "hwk", "swk", "totp"])
+    oidc_idp_enforces_mfa: bool = False
 
     # --- Sessions & auth ---
     session_ttl_hours: int = Field(default=12, ge=1, le=72)
@@ -110,6 +145,12 @@ class Settings(BaseSettings):
     otel_enabled: bool = False
     log_format: Literal["json", "text"] = "json"
 
+    # Concurrent live-update (SSE) streams (P7): per tenant and per user.
+    sse_streams_per_tenant: int = Field(default=100, ge=1, le=10_000)
+    sse_streams_per_user: int = Field(default=6, ge=1, le=100)
+    # Per-user AI requests per hour (P7), on top of the tenant's daily token budget.
+    ai_requests_per_user_hour: int = Field(default=120, ge=1, le=10_000)
+
     # Per-tenant API budget for expensive endpoints (scenario replay, event search).
     tenant_heavy_requests_per_minute: int = Field(default=60, ge=1, le=10_000)
     # Per-tenant ingest quota (records per minute). Over-quota records are dead-lettered with
@@ -119,10 +160,13 @@ class Settings(BaseSettings):
 
     def _url(self, user: str, password: SecretStr | None) -> str:
         pw = quote(password.get_secret_value(), safe="") if password else ""
-        return (
+        url = (
             f"postgresql+psycopg://{quote(user, safe='')}:{pw}"
             f"@{self.database_host}:{self.database_port}/{self.database_name}"
         )
+        if self.tls_ca_file:  # hardened profile: TLS with full certificate and host name checks
+            url += f"?sslmode=verify-full&sslrootcert={quote(self.tls_ca_file, safe='/')}"
+        return url
 
     def app_database_url(self) -> str:
         return self._url(self.database_user, self.database_password)

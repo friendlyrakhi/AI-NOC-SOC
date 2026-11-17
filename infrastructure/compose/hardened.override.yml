@@ -1,0 +1,273 @@
+# Hardened profile (P7, NFR-9): TLS between services, secure browser cookies and OpenBao as the
+# secrets provider. Layered on top of docker-compose.yml:
+#   scripts/dev.ps1 up -Hardened      (or: scripts/dev.sh up --hardened)
+# Certificates come from scripts/certs.py (local dev CA in infrastructure/secrets/tls). Browse to
+# https://127.0.0.1:3443 after trusting ca.crt; the plain web port is closed.
+#
+# TLS: Postgres (verify-full, hostssl only), Valkey, ClickHouse (HTTPS), OpenSearch (HTTP layer),
+# the API, the AI gateway, OpenBao and the browser edge. Not yet TLS (documented in the P7 exit
+# review): Redpanda and the Temporal dev server (no credentials or secrets cross them), and the
+# OpenSearch node transport (single node, image demo certificate).
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+
+x-tls-client: &tls-client
+  NOCSOC_TLS_CA_FILE: /run/secrets/tls_ca
+  NOCSOC_VALKEY_TLS: "true"
+  NOCSOC_CLICKHOUSE_SECURE: "true"
+  NOCSOC_CLICKHOUSE_PORT: "8443"
+  NOCSOC_OPENSEARCH_URL: https://opensearch:9200
+
+x-openbao-client: &openbao-client
+  NOCSOC_SECRETS_PROVIDER: openbao
+  NOCSOC_OPENBAO_URL: https://openbao:8200
+
+services:
+  postgres:
+    secrets: [postgres_password, postgres_tls_crt, postgres_tls_key]
+    # The server refuses a key file readable by others: copy it with owner-only permissions first.
+    entrypoint:
+      - sh
+      - -c
+      - install -m 0600 -o postgres -g postgres /run/secrets/postgres_tls_key /var/lib/postgresql/server.key && exec docker-entrypoint.sh "$$@"
+      - --
+    command: !override
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - max_connections=100
+      - -c
+      - log_connections=on
+      - -c
+      - ssl=on
+      - -c
+      - ssl_min_protocol_version=TLSv1.2
+      - -c
+      - ssl_cert_file=/run/secrets/postgres_tls_crt
+      - -c
+      - ssl_key_file=/var/lib/postgresql/server.key
+      - -c
+      - hba_file=/etc/postgresql/pg_hba.conf
+    volumes:
+      - ./hardened/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+
+  valkey:
+    secrets: [valkey_password, valkey_tls_crt, valkey_tls_key, tls_ca]
+    command: !override
+      - >-
+        umask 077 &&
+        printf 'requirepass %s\n' "$$(cat /run/secrets/valkey_password)" > /tmp/valkey.conf &&
+        exec valkey-server /tmp/valkey.conf
+        --port 0 --tls-port 6379
+        --tls-cert-file /run/secrets/valkey_tls_crt --tls-key-file /run/secrets/valkey_tls_key
+        --tls-ca-cert-file /run/secrets/tls_ca --tls-auth-clients no
+        --maxmemory 256mb --maxmemory-policy allkeys-lru
+        --save "" --appendonly no --protected-mode yes
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(cat /run/secrets/valkey_password)\" valkey-cli --tls --cacert /run/secrets/tls_ca ping | grep -q PONG"]
+
+  clickhouse:
+    secrets: [clickhouse_admin_password, clickhouse_tls_crt, clickhouse_tls_key]
+    volumes:
+      - ./hardened/clickhouse-tls.xml:/etc/clickhouse-server/config.d/tls.xml:ro
+    ports: !override
+      - "127.0.0.1:${NOCSOC_CLICKHOUSE_PORT:-8123}:8443"
+
+  opensearch:
+    environment:
+      plugins.security.ssl.http.enabled: "true"
+      plugins.security.ssl.http.pemcert_filepath: http.crt
+      plugins.security.ssl.http.pemkey_filepath: http.key
+      plugins.security.ssl.http.pemtrustedcas_filepath: http-ca.crt
+    volumes:
+      - ../secrets/tls/opensearch.crt:/usr/share/opensearch/config/http.crt:ro
+      - ../secrets/tls/opensearch.key:/usr/share/opensearch/config/http.key:ro
+      - ../secrets/tls/ca.crt:/usr/share/opensearch/config/http-ca.crt:ro
+    healthcheck:
+      test: ["CMD-SHELL", "[ \"$$(curl -s --cacert /usr/share/opensearch/config/http-ca.crt -o /dev/null -w '%{http_code}' https://opensearch:9200/)\" = 401 ]"]
+
+  openbao:
+    <<: *hardening
+    profiles: [core]
+    networks: [secrets]
+    # OpenBao 2.7.2, single-node Raft storage, TLS. Sealed after every restart until openbao-setup unseals it.
+    image: quay.io/openbao/openbao@sha256:5046911075e137e154ce49ab051502f4ec7cf367d484ae4a4dce665d9b90561f
+    command: ["server"]
+    secrets: [openbao_tls_crt, openbao_tls_key]
+    volumes:
+      - ./hardened/openbao.hcl:/openbao/config/openbao.hcl:ro
+      - baodata:/openbao/file
+    cap_drop: [ALL]
+    healthcheck:
+      # Answers once the listener is up (sealed or not); openbao-setup unseals it.
+      test: ["CMD-SHELL", "wget -q -O /dev/null --no-check-certificate 'https://127.0.0.1:8200/v1/sys/health?sealedcode=200&uninitcode=200'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    mem_limit: 256m
+
+  # One-shot: initialise (once), unseal, Transit key, AppRole for the platform (app.tools.openbao_setup).
+  openbao-setup:
+    <<: *hardening
+    restart: "no"
+    profiles: [core]
+    networks: [secrets]
+    image: nocsoc/api:dev
+    command: ["python", "-m", "app.tools.openbao_setup"]
+    environment:
+      NOCSOC_OPENBAO_URL: https://openbao:8200
+      NOCSOC_TLS_CA_FILE: /run/secrets/tls_ca
+    secrets: [tls_ca]
+    volumes:
+      - baoinit:/var/lib/openbao-init
+      - baoapprole:/run/openbao
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    depends_on:
+      openbao: { condition: service_healthy }
+    mem_limit: 128m
+
+  migrate:
+    networks: [data, secrets]
+    environment:
+      <<: [*tls-client, *openbao-client]
+    secrets: [tls_ca]
+    volumes:
+      - baoapprole:/run/openbao:ro
+    depends_on:
+      openbao-setup: { condition: service_completed_successfully }
+
+  api:
+    networks: [data, bus, frontend, ai, workflow, search, telemetry, secrets]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-server-header",
+              "--ssl-keyfile", "/run/secrets/api_tls_key", "--ssl-certfile", "/run/secrets/api_tls_crt",
+              "--workers", "${NOCSOC_API_WORKERS:-4}"]
+    environment:
+      <<: [*tls-client, *openbao-client]
+      NOCSOC_AI_GATEWAY_URL: https://ai-gateway:8200
+      NOCSOC_WEB_BASE_URL: https://127.0.0.1:${NOCSOC_EDGE_PORT:-3443}
+      NOCSOC_OIDC_REDIRECT_URI: https://127.0.0.1:${NOCSOC_EDGE_PORT:-3443}/login/sso/callback
+    secrets: [tls_ca, api_tls_crt, api_tls_key]
+    volumes:
+      - baoapprole:/run/openbao:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import ssl,urllib.request,sys; c=ssl.create_default_context(cafile='/run/secrets/tls_ca'); sys.exit(0 if urllib.request.urlopen('https://api:8000/api/v1/health/ready', timeout=3, context=c).status == 200 else 1)"]
+
+  ai-gateway:
+    command: ["python", "-m", "uvicorn", "ai_gateway.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8200",
+              "--ssl-keyfile", "/run/secrets/ai_gateway_tls_key", "--ssl-certfile", "/run/secrets/ai_gateway_tls_crt"]
+    secrets: [tls_ca, ai_gateway_tls_crt, ai_gateway_tls_key]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import ssl,urllib.request,sys; c=ssl.create_default_context(cafile='/run/secrets/tls_ca'); sys.exit(0 if urllib.request.urlopen('https://ai-gateway:8200/health', timeout=3, context=c).status == 200 else 1)"]
+
+  ingest-worker:
+    environment:
+      <<: *tls-client
+    secrets: [tls_ca]
+
+  migrate-stream:
+    environment:
+      <<: *tls-client
+    secrets: [tls_ca]
+
+  opensearch-setup:
+    environment:
+      NOCSOC_OPENSEARCH_URL: https://opensearch:9200
+      NOCSOC_TLS_CA_FILE: /run/secrets/tls_ca
+    secrets: [tls_ca]
+
+  audit-anchor:
+    environment:
+      NOCSOC_TLS_CA_FILE: /run/secrets/tls_ca
+    secrets: [tls_ca]
+
+  audit-verify:
+    environment:
+      NOCSOC_TLS_CA_FILE: /run/secrets/tls_ca
+    secrets: [tls_ca]
+
+  connector-runner:
+    environment:
+      NOCSOC_API_URL: https://api:8000
+      NOCSOC_TLS_CA_FILE: /run/secrets/tls_ca
+    secrets: [tls_ca]
+
+  workflow-worker:
+    environment:
+      NOCSOC_API_URL: https://api:8000
+      NOCSOC_TLS_CA_FILE: /run/secrets/tls_ca
+    secrets: [tls_ca]
+
+  web:
+    environment:
+      NOCSOC_API_INTERNAL_URL: https://api:8000
+      NODE_EXTRA_CA_CERTS: /run/secrets/tls_ca
+      NOCSOC_COOKIE_SECURE: "true"
+    secrets: [tls_ca]
+    # Only through the TLS edge.
+    ports: !reset []
+
+  # TLS for the browser (Caddy 2.11), in front of the web BFF.
+  edge:
+    <<: *hardening
+    profiles: [core]
+    networks: [frontend]
+    image: caddy@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    secrets: [edge_tls_crt, edge_tls_key]
+    volumes:
+      - ./hardened/Caddyfile:/etc/caddy/Caddyfile:ro
+    read_only: true
+    tmpfs: [/tmp, /data, /config]
+    cap_drop: [ALL]
+    depends_on:
+      web: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:${NOCSOC_EDGE_PORT:-3443}:3443"
+    mem_limit: 128m
+
+secrets:
+  tls_ca:
+    file: ../secrets/tls/ca.crt
+  postgres_tls_crt:
+    file: ../secrets/tls/postgres.crt
+  postgres_tls_key:
+    file: ../secrets/tls/postgres.key
+  valkey_tls_crt:
+    file: ../secrets/tls/valkey.crt
+  valkey_tls_key:
+    file: ../secrets/tls/valkey.key
+  clickhouse_tls_crt:
+    file: ../secrets/tls/clickhouse.crt
+  clickhouse_tls_key:
+    file: ../secrets/tls/clickhouse.key
+  api_tls_crt:
+    file: ../secrets/tls/api.crt
+  api_tls_key:
+    file: ../secrets/tls/api.key
+  ai_gateway_tls_crt:
+    file: ../secrets/tls/ai-gateway.crt
+  ai_gateway_tls_key:
+    file: ../secrets/tls/ai-gateway.key
+  openbao_tls_crt:
+    file: ../secrets/tls/openbao.crt
+  openbao_tls_key:
+    file: ../secrets/tls/openbao.key
+  edge_tls_crt:
+    file: ../secrets/tls/edge.crt
+  edge_tls_key:
+    file: ../secrets/tls/edge.key
+
+networks:
+  # OpenBao, its setup job, the API and the migrate job (seeding encrypts MFA secrets). No internet.
+  secrets:
+    internal: true
+
+volumes:
+  baodata:
+  baoinit:
+  baoapprole:

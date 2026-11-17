@@ -1,0 +1,91 @@
+# Platform SLOs (P7, docs/operations/slos.md). Metric names are the Prometheus OTLP translation
+# of the OpenTelemetry instruments in backend/app/telemetry.py and the FastAPI instrumentation
+# (stable HTTP semantic conventions: http.server.request.duration in seconds).
+groups:
+  - name: nocsoc-slo-recording
+    interval: 30s
+    rules:
+      # --- API availability (SLO: 99.5 % of requests are not server errors, 30 days)
+      - record: nocsoc:api_requests:rate5m
+        expr: sum(rate(http_server_request_duration_seconds_count{service_name="nocsoc-api"}[5m]))
+      - record: nocsoc:api_errors:rate5m
+        expr: sum(rate(http_server_request_duration_seconds_count{service_name="nocsoc-api",http_response_status_code=~"5.."}[5m])) or vector(0)
+      - record: nocsoc:api_error_ratio:rate5m
+        expr: nocsoc:api_errors:rate5m / clamp_min(nocsoc:api_requests:rate5m, 1e-9)
+      - record: nocsoc:api_error_ratio:rate1h
+        expr: |
+          (sum(rate(http_server_request_duration_seconds_count{service_name="nocsoc-api",http_response_status_code=~"5.."}[1h])) or vector(0))
+          / clamp_min(sum(rate(http_server_request_duration_seconds_count{service_name="nocsoc-api"}[1h])), 1e-9)
+      - record: nocsoc:api_error_ratio:rate6h
+        expr: |
+          (sum(rate(http_server_request_duration_seconds_count{service_name="nocsoc-api",http_response_status_code=~"5.."}[6h])) or vector(0))
+          / clamp_min(sum(rate(http_server_request_duration_seconds_count{service_name="nocsoc-api"}[6h])), 1e-9)
+      # --- API read latency (SLO / NFR-1: p95 of GET requests < 300 ms)
+      - record: nocsoc:api_read_latency_seconds:p95_5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name="nocsoc-api",http_request_method="GET"}[5m])))
+      - record: nocsoc:api_read_latency_seconds:p95_by_route_5m
+        expr: histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{service_name="nocsoc-api",http_request_method="GET"}[5m])))
+      # --- Ingest freshness (SLO / NFR-1: p95 connector -> stored < 5 s) and throughput (NFR-2)
+      - record: nocsoc:ingest_latency_seconds:p95_5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(nocsoc_ingest_latency_seconds_bucket[5m])))
+      - record: nocsoc:ingest_messages:rate1m
+        expr: sum by (result) (rate(nocsoc_ingest_messages_total[1m]))
+
+  - name: nocsoc-slo-alerts
+    rules:
+      # Multi-window burn rate for a 99.5 % objective: 14.4x burns 2 % of a 30-day budget in 1 h.
+      - alert: ApiErrorBudgetFastBurn
+        expr: nocsoc:api_error_ratio:rate1h > (14.4 * 0.005) and nocsoc:api_error_ratio:rate5m > (14.4 * 0.005)
+        for: 2m
+        labels: { severity: page, slo: api-availability }
+        annotations:
+          summary: API server errors are burning the 30-day error budget fast
+          runbook: docs/operations/runbook.md#api-errors
+      - alert: ApiErrorBudgetSlowBurn
+        expr: nocsoc:api_error_ratio:rate6h > (6 * 0.005)
+        for: 15m
+        labels: { severity: ticket, slo: api-availability }
+        annotations:
+          summary: API server errors are steadily consuming the error budget
+          runbook: docs/operations/runbook.md#api-errors
+      - alert: ApiReadLatencyHigh
+        expr: nocsoc:api_read_latency_seconds:p95_5m > 0.3
+        for: 15m
+        labels: { severity: ticket, slo: api-latency }
+        annotations:
+          summary: p95 of GET requests above 300 ms for 15 minutes (NFR-1)
+          runbook: docs/operations/runbook.md#slow-api
+      - alert: IngestLatencyHigh
+        expr: nocsoc:ingest_latency_seconds:p95_5m > 5
+        for: 10m
+        labels: { severity: page, slo: ingest-freshness }
+        annotations:
+          summary: Alerts take more than 5 s (p95) from connector to storage (NFR-1)
+          runbook: docs/operations/runbook.md#ingest-lag
+      - alert: TelemetryOutboxBacklog
+        expr: max(nocsoc_outbox_pending) > 0
+        for: 15m
+        labels: { severity: ticket, slo: telemetry-delivery }
+        annotations:
+          summary: Telemetry rows have waited more than 15 minutes for ClickHouse or OpenSearch
+          runbook: docs/operations/runbook.md#outbox-backlog
+      - alert: ProjectorFailing
+        expr: sum(increase(nocsoc_projector_failures_total[15m])) > 0
+        for: 15m
+        labels: { severity: ticket, slo: kpi-freshness }
+        annotations:
+          summary: KPI/search projection keeps failing; dashboards and search are going stale
+          runbook: docs/operations/runbook.md#projector
+      - alert: AuditAnchorMismatch
+        expr: sum(increase(nocsoc_audit_anchor_problems_total[1h])) > 0
+        labels: { severity: page, slo: audit-integrity }
+        annotations:
+          summary: The audit log no longer matches its external anchors (possible tampering)
+          runbook: docs/operations/runbook.md#audit-anchor-mismatch
+      - alert: AuditAnchorStalled
+        expr: sum(increase(nocsoc_audit_anchor_runs_total[30m])) == 0
+        for: 10m
+        labels: { severity: ticket, slo: audit-integrity }
+        annotations:
+          summary: No audit anchor check in 30 minutes
+          runbook: docs/operations/runbook.md#audit-anchor-mismatch

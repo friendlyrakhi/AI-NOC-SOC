@@ -24,6 +24,7 @@ def _client(services: Services) -> httpx.AsyncClient:
         timeout=s.ai_request_timeout_seconds,
         transport=services.ai_transport,  # injected in tests (in-process gateway)
         follow_redirects=False,
+        verify=s.tls_ca_file or True,  # hardened profile: the gateway serves TLS
     )
 
 

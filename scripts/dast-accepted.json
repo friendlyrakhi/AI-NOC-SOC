@@ -1,0 +1,17 @@
+{
+  "comment": "ZAP alerts reviewed in P7 (docs/reports/P7-exit-review.md). Only High-risk alerts fail scripts/dast.py; Medium ones are listed here with the reason they are accepted.",
+  "accepted": [
+    {
+      "pluginId": 10202,
+      "alert": "Absence of Anti-CSRF Tokens",
+      "risk": "Medium",
+      "reason": "All mutations are Next.js Server Actions (POST) protected by the framework's Origin/Host check plus SameSite=Strict HttpOnly session cookies (ADR-0017, threat model T3, SEC-WEB-03). There are no cookie-authenticated GET mutations."
+    },
+    {
+      "pluginId": 10055,
+      "alert": "CSP: style-src unsafe-inline",
+      "risk": "Medium",
+      "reason": "Inline style attributes are needed by React style props and the charts. Scripts are nonce-only with 'strict-dynamic' (no unsafe-inline), so injected markup cannot execute code; styles alone cannot exfiltrate the HttpOnly session."
+    }
+  ]
+}

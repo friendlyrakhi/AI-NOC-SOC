@@ -16,12 +16,13 @@ class PlatformApi(Protocol):
 
 
 class HttpPlatformApi:
-    def __init__(self, base_url: str, token: str) -> None:
+    def __init__(self, base_url: str, token: str, verify: str | bool = True) -> None:
         self._client = httpx.AsyncClient(
             base_url=base_url.rstrip("/") + "/api/v1/internal/runner",
             headers={"X-Runner-Token": token},
             timeout=15.0,
             follow_redirects=False,
+            verify=verify,  # hardened profile: credentials travel over TLS to the platform CA
         )
 
     async def close(self) -> None:

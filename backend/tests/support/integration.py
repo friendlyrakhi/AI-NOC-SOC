@@ -160,7 +160,8 @@ class Api:
         return {"Authorization": f"Bearer {self.login(email)}"}
 
     def step_up(self, email: str) -> None:
-        r = self.client.post("/api/v1/auth/step-up", json={"code": self.code(email)}, headers=self.headers(email))
+        headers = self.headers(email)  # sign in first: a first sign-in consumes the current code
+        r = self.client.post("/api/v1/auth/step-up", json={"code": self.code(email)}, headers=headers)
         assert r.status_code == 204, r.text
 
     def switch(self, email: str, slug: str, *, aggregate: bool = False) -> None:

@@ -23,6 +23,7 @@ from app.core.authz.deps import get_principal, requires
 from app.core.authz.principal import Principal
 from app.core.cache import tenant_budget
 from app.core.tenancy.common import record, tenant_tx
+from app.core.types import StrictBool, StrictInt
 from app.errors import ProblemError, not_found
 from app.integrations.common import (
     build,
@@ -139,8 +140,8 @@ class InstanceCreate(BaseModel):
 class InstancePatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     config: dict[str, Any] | None = None
-    enabled: bool | None = None
-    version: int = Field(ge=1, description="Current version (optimistic concurrency).")
+    enabled: StrictBool | None = None
+    version: StrictInt = Field(ge=1, description="Current version (optimistic concurrency).")
 
 
 class CredentialsIn(BaseModel):

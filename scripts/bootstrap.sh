@@ -15,7 +15,7 @@ done
 
 umask 077
 mkdir -p infrastructure/secrets infrastructure/certs
-for name in postgres_password database_password auth_database_password valkey_password master_key worker_database_password runner_token clickhouse_admin_password clickhouse_ingest_password clickhouse_reader_password ai_gateway_token workflow_token; do
+for name in postgres_password database_password auth_database_password valkey_password master_key worker_database_password runner_token clickhouse_admin_password clickhouse_ingest_password clickhouse_reader_password ai_gateway_token workflow_token audit_anchor_key grafana_admin_password oidc_client_secret sso_demo_password keycloak_admin_password; do
   f="infrastructure/secrets/$name"
   if [[ -f "$f" && $rotate -eq 0 ]]; then
     echo "==> secret $name exists (kept)"
@@ -45,4 +45,7 @@ if [[ $install -eq 1 ]]; then
   echo "==> uv sync"; uv sync
   echo "==> pnpm install"; pnpm install --frozen-lockfile
 fi
+# TLS certificates for the hardened profile (P7). Needs the `cryptography` package (uv sync).
+if [[ -x .venv/bin/python ]]; then .venv/bin/python scripts/certs.py
+else echo "==> certificates skipped (no Python environment yet): run scripts/certs.py after uv sync"; fi
 echo "Bootstrap complete. Next: scripts/dev.sh up"

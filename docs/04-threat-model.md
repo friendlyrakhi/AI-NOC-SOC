@@ -146,17 +146,24 @@ Data that crosses into TB3/TB5 from TB1, TB4 or TB7 is **untrusted**, including 
 - Security telemetry contains personal data (usernames, IPs, emails). Design for GDPR-style minimization: redaction before AI egress, retention TTLs, tenant-level export/delete.
 - Audit-relevant frameworks to align with later: SOC 2 CC6/CC7, ISO 27001 Annex A 5.15–5.18, 8.15–8.16. No compliance claims are made by this project.
 
-## 7. Residual risks (accepted for dev phase)
+## 7. Residual risks
 
-| Risk | Why accepted now | Revisit |
-|------|------------------|---------|
-| Deleting the **newest** audit entries (tail truncation) is not detectable from the chain alone; modified or missing middle entries are | Needs anchors stored outside the database | P7: exported anchors (already planned) |
-| A user granted a privileged role mid-session cannot step up until they enroll MFA at next sign-in | Login enforces enrollment; no privilege is gained without MFA for step-up actions | P7 review |
-| Dev cookies are not `Secure` over local http | Loopback only, mock data | P7 TLS profile |
-| Dev master key on local disk | Single-user PC, mock data only | Before any real credential is stored (Phase 8) → OpenBao/KMS |
-| No TLS between containers in `core` profile | Localhost Docker network, mock data | Hardened profile in Phase 7 |
-| Local accounts instead of enterprise IdP | Simplicity | OIDC (Entra ID/Keycloak) in Phase 7 |
-| Single-node data stores, no backups | Mock data | Backup/restore scripts in Phase 7 |
+Re-reviewed in P7 (2026-11-17, [reports/P7-exit-review.md](reports/P7-exit-review.md)).
+
+| Risk | Status after P7 |
+|------|-----------------|
+| Deleting the **newest** audit entries (tail truncation) is not detectable from the chain alone | **Closed.** The audit-anchor service signs each chain head (HMAC, key outside the database) into a chained file on its own volume, re-checks it every 5 minutes, and alerts. `verify-audit` checks the chains and every anchor (SEC-AUD-02 extended; tests for truncation and file tampering). |
+| A user granted a privileged role mid-session could use it without MFA (`requires_mfa` was never enforced) | **Closed.** Sessions record whether they were established with MFA. Privileged permissions are withheld from other sessions until a step-up or a new MFA sign-in, and `/auth/me` reports them as withheld. |
+| Dev cookies are not `Secure` over local http | **Closed in the hardened profile** (TLS edge, `Secure` cookies, HSTS). The default dev stack stays on http://127.0.0.1. |
+| No TLS between containers | **Closed in the hardened profile** for Postgres (verify-full), Valkey, ClickHouse, OpenSearch, the API, the AI gateway and OpenBao. Open for Redpanda, the Temporal dev server and OpenSearch node transport, which carry no credentials. |
+| Dev master key on local disk | **Mitigated in the hardened profile:** data keys come from OpenBao Transit, and existing values are rewrapped. OpenBao's own unseal key is dev-grade, so KMS or Shamir is still required before P8. |
+| Local accounts instead of an enterprise IdP | **Closed (optional):** OIDC code flow with PKCE (Keycloak profile; Entra ID by configuration). Users are matched to existing accounts only, and MFA status comes from `amr` or an explicit IdP policy. |
+| Single-node data stores, no backups | **Mitigated:** backup and restore of every store, plus a restore drill into an empty stack. Still single-node (no HA). |
+| Telemetry writes after commit were best effort | **Closed:** transactional outbox and relay (at-least-once). A rare ClickHouse duplicate after a crash is accepted. |
+| Unbounded SSE streams per tenant; no per-user AI limit | **Closed:** stream leases per tenant (100) and per user (6), and 120 AI requests per user per hour |
+| Lax request validation (numbers as booleans or timestamps; unbounded cursors caused a 500) | **Closed:** found by Schemathesis; strict types on request models; cursors bounded |
+| Shared runner and workflow tokens; no per-tenant workload identity | Open: P8 (OpenBao AppRoles per workload) |
+| OpenBao unseal key and root token in a local volume | Open: dev-grade by design; KMS auto-unseal before P8 |
 
 ## 8. Security release gates
 

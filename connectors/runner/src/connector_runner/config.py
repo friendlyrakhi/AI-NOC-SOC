@@ -17,6 +17,8 @@ class RunnerSettings(BaseSettings):
 
     api_url: str = "http://api:8000"
     runner_token: SecretStr | None = None
+    # Hardened profile (P7): CA bundle for the API's TLS certificate.
+    tls_ca_file: str | None = None
     kafka_bootstrap: str = "redpanda:9092"
     poll_seconds: float = Field(default=5.0, ge=0.5, le=300)
     max_pages_per_run: int = Field(default=10, ge=1, le=100)

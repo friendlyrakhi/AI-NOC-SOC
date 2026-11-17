@@ -744,6 +744,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/oidc/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Oidc Callback */
+        post: operations["oidc_callback_api_v1_auth_oidc_callback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/oidc/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Oidc Config */
+        get: operations["oidc_config_api_v1_auth_oidc_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/oidc/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Oidc Start */
+        post: operations["oidc_start_api_v1_auth_oidc_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/step-up": {
         parameters: {
             query?: never;
@@ -2198,6 +2249,9 @@ export interface paths {
         /**
          * Stream
          * @description ``text/event-stream`` of ``alert.upserted`` and ``incident.changed`` for the caller's tenant.
+         *
+         *     Concurrent streams are capped per tenant and per user (429 ``stream.limit``), so one tenant
+         *     cannot exhaust the API's connections (P3 residual). Slots are leases renewed by the heartbeat.
          */
         get: operations["stream_api_v1_stream_get"];
         put?: never;
@@ -3555,11 +3609,6 @@ export interface components {
              */
             status: "succeeded" | "failed" | "halted" | "cancelled";
         };
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
-        };
         /** HistogramBucket */
         HistogramBucket: {
             /** Count */
@@ -4294,6 +4343,11 @@ export interface components {
             user_id: string;
             /** Via Msp Tenant Id */
             via_msp_tenant_id: string | null;
+            /**
+             * Withheld Permissions
+             * @default []
+             */
+            withheld_permissions: string[];
         };
         /** MemberOut */
         MemberOut: {
@@ -4378,6 +4432,25 @@ export interface components {
             id: string;
             /** Invitation Sent */
             invitation_sent: boolean;
+        };
+        /** OidcCallbackIn */
+        OidcCallbackIn: {
+            /** Code */
+            code: string;
+            /** State */
+            state: string;
+        };
+        /** OidcConfigOut */
+        OidcConfigOut: {
+            /** Display Name */
+            display_name: string;
+            /** Enabled */
+            enabled: boolean;
+        };
+        /** OidcStartOut */
+        OidcStartOut: {
+            /** Authorization Url */
+            authorization_url: string;
         };
         /** OpenIncident */
         OpenIncident: {
@@ -4516,6 +4589,21 @@ export interface components {
             require_justification: boolean;
             /** Tier Override */
             tier_override?: ("T0" | "T1" | "T2" | "T3") | null;
+        };
+        /** Problem */
+        Problem: {
+            /** @description Stable machine-readable error code */
+            code: string;
+            detail?: string | null;
+            errors?: {
+                loc?: unknown[];
+                msg?: string;
+                type?: string;
+            }[];
+            instance?: string | null;
+            status: number;
+            title: string;
+            type: string;
         };
         /** RawEventOut */
         RawEventOut: {
@@ -5326,19 +5414,6 @@ export interface components {
             /** Kind */
             kind: string;
         };
-        /** ValidationError */
-        ValidationError: {
-            /** Context */
-            ctx?: Record<string, never>;
-            /** Input */
-            input?: unknown;
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
-        };
         /** VersionIn */
         VersionIn: {
             /** Definition */
@@ -5551,6 +5626,33 @@ export interface operations {
                     "application/json": components["schemas"]["CatalogEntry"][];
                 };
             };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     put_policy_api_v1_actions_policies__action_key__put: {
@@ -5577,13 +5679,31 @@ export interface operations {
                     "application/json": components["schemas"]["CatalogEntry"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5611,13 +5731,31 @@ export interface operations {
                     "application/json": components["schemas"]["RequestOut"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5646,13 +5784,31 @@ export interface operations {
                     "application/json": components["schemas"]["RequestOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5677,13 +5833,31 @@ export interface operations {
                     "application/json": components["schemas"]["RequestOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5712,13 +5886,31 @@ export interface operations {
                     "application/json": components["schemas"]["RequestOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5743,13 +5935,31 @@ export interface operations {
                     "application/json": components["schemas"]["RequestOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5778,13 +5988,31 @@ export interface operations {
                     "application/json": components["schemas"]["RequestOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5809,13 +6037,31 @@ export interface operations {
                     "application/json": components["schemas"]["AggregateActivityOut"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5836,6 +6082,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AggregateCustomerOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5860,13 +6133,31 @@ export interface operations {
                     "application/json": components["schemas"]["AiRunOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5889,6 +6180,33 @@ export interface operations {
                     "application/json": components["schemas"]["AiRunOut"];
                 };
             };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     latest_briefing_api_v1_ai_briefing_latest_get: {
@@ -5907,6 +6225,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiRunOut"] | null;
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5933,13 +6278,31 @@ export interface operations {
                     "application/json": components["schemas"]["AiRunOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5965,13 +6328,31 @@ export interface operations {
                     "application/json": components["schemas"]["AiRunOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5998,13 +6379,31 @@ export interface operations {
                     "application/json": components["schemas"]["AiRunOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6031,13 +6430,31 @@ export interface operations {
                     "application/json": components["schemas"]["AiRunOut"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6062,13 +6479,31 @@ export interface operations {
                     "application/json": components["schemas"]["AiRunOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6097,13 +6532,31 @@ export interface operations {
                     "application/json": components["schemas"]["AiRunOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6124,6 +6577,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiSettingsOut"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6150,13 +6630,31 @@ export interface operations {
                     "application/json": components["schemas"]["AiSettingsOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6177,6 +6675,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiUsageOut"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6211,13 +6736,31 @@ export interface operations {
                     "application/json": components["schemas"]["AlertPage"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6242,13 +6785,31 @@ export interface operations {
                     "application/json": components["schemas"]["SummaryOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6273,13 +6834,31 @@ export interface operations {
                     "application/json": components["schemas"]["AlertOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6304,13 +6883,31 @@ export interface operations {
                     "application/json": components["schemas"]["RawEventOut"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6339,13 +6936,31 @@ export interface operations {
                     "application/json": components["schemas"]["AlertOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6371,13 +6986,31 @@ export interface operations {
                     "application/json": components["schemas"]["KpiSet"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6406,13 +7039,31 @@ export interface operations {
                     "application/json": components["schemas"]["Drill"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6441,13 +7092,31 @@ export interface operations {
                     "application/json": components["schemas"]["SeriesPoint"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6468,6 +7137,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiKeyOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6494,13 +7190,31 @@ export interface operations {
                     "application/json": components["schemas"]["ApiKeyCreated"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6523,13 +7237,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6550,6 +7282,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RequestOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6577,13 +7336,31 @@ export interface operations {
                     "application/json": components["schemas"]["AssetPage"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6608,13 +7385,31 @@ export interface operations {
                     "application/json": components["schemas"]["AssetDetail"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6641,13 +7436,31 @@ export interface operations {
                     "application/json": components["schemas"]["AuditOut"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6668,6 +7481,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditVerifyOut"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6694,13 +7534,31 @@ export interface operations {
                     "application/json": components["schemas"]["AcceptInvitationResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6727,13 +7585,31 @@ export interface operations {
                     "application/json": components["schemas"]["LoginResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6754,6 +7630,33 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     me_api_v1_auth_me_get: {
@@ -6772,6 +7675,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6798,13 +7728,31 @@ export interface operations {
                     "application/json": components["schemas"]["SessionResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6831,13 +7779,31 @@ export interface operations {
                     "application/json": components["schemas"]["EnrollmentResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6864,13 +7830,176 @@ export interface operations {
                     "application/json": components["schemas"]["SessionResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    oidc_callback_api_v1_auth_oidc_callback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OidcCallbackIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    oidc_config_api_v1_auth_oidc_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OidcConfigOut"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    oidc_start_api_v1_auth_oidc_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OidcStartOut"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6895,13 +8024,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6926,13 +8073,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6958,13 +8123,31 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerKpis"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -6989,13 +8172,31 @@ export interface operations {
                     "application/json": components["schemas"]["Overview"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7021,13 +8222,31 @@ export interface operations {
                     "application/json": components["schemas"]["DeadLetterOut"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7050,6 +8269,33 @@ export interface operations {
                     "application/json": components["schemas"]["DefinitionOut"][];
                 };
             };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     list_instances_api_v1_connectors_instances_get: {
@@ -7068,6 +8314,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InstanceOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7094,13 +8367,31 @@ export interface operations {
                     "application/json": components["schemas"]["InstanceCreated"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7125,13 +8416,31 @@ export interface operations {
                     "application/json": components["schemas"]["InstanceOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7154,13 +8463,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7189,13 +8516,31 @@ export interface operations {
                     "application/json": components["schemas"]["InstanceOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7222,13 +8567,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7255,13 +8618,31 @@ export interface operations {
                     "application/json": components["schemas"]["RunOut"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7288,13 +8669,31 @@ export interface operations {
                     };
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7319,13 +8718,31 @@ export interface operations {
                     "application/json": components["schemas"]["ConnectionTestOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7350,13 +8767,31 @@ export interface operations {
                     "application/json": components["schemas"]["WebhookSecretOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7377,6 +8812,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScenarioOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7403,13 +8865,31 @@ export interface operations {
                     "application/json": components["schemas"]["ReplayOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7430,6 +8910,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RuleOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7458,13 +8965,31 @@ export interface operations {
                     "application/json": components["schemas"]["RuleOut"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7485,6 +9010,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7511,13 +9063,31 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerCreated"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7538,6 +9108,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DelegationOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7564,13 +9161,31 @@ export interface operations {
                     "application/json": components["schemas"]["DelegationOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7595,13 +9210,31 @@ export interface operations {
                     "application/json": components["schemas"]["DelegationOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7635,13 +9268,31 @@ export interface operations {
                     "application/json": components["schemas"]["EventPage"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7669,13 +9320,31 @@ export interface operations {
                     "application/json": components["schemas"]["HistogramBucket"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7696,6 +9365,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DependencyStatus"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7720,6 +9416,33 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     ready_api_v1_health_ready_get: {
@@ -7740,6 +9463,33 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7765,13 +9515,31 @@ export interface operations {
                     "application/json": components["schemas"]["HuntRunOut"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7798,13 +9566,31 @@ export interface operations {
                     "application/json": components["schemas"]["HuntRunOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7829,13 +9615,31 @@ export interface operations {
                     "application/json": components["schemas"]["HuntRunOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7862,13 +9666,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7893,13 +9715,31 @@ export interface operations {
                     "application/json": components["schemas"]["HuntResultsOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7920,6 +9760,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HuntOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7946,13 +9813,31 @@ export interface operations {
                     "application/json": components["schemas"]["HuntOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -7975,13 +9860,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8014,13 +9917,31 @@ export interface operations {
                     "application/json": components["schemas"]["IncidentPage"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8047,13 +9968,31 @@ export interface operations {
                     "application/json": components["schemas"]["IncidentOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8079,13 +10018,31 @@ export interface operations {
                     "application/json": components["schemas"]["MetricsOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8110,13 +10067,31 @@ export interface operations {
                     "application/json": components["schemas"]["IncidentOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8145,13 +10120,31 @@ export interface operations {
                     "application/json": components["schemas"]["IncidentOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8176,13 +10169,31 @@ export interface operations {
                     "application/json": components["schemas"]["LinkedAlert"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8211,13 +10222,31 @@ export interface operations {
                     "application/json": components["schemas"]["IncidentOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8241,13 +10270,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8276,13 +10323,31 @@ export interface operations {
                     "application/json": components["schemas"]["TimelineOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8311,13 +10376,31 @@ export interface operations {
                     "application/json": components["schemas"]["IncidentOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8346,13 +10429,31 @@ export interface operations {
                     "application/json": components["schemas"]["IncidentOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8381,13 +10482,31 @@ export interface operations {
                     "application/json": components["schemas"]["IncidentOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8412,13 +10531,31 @@ export interface operations {
                     "application/json": components["schemas"]["TaskOut"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8447,13 +10584,31 @@ export interface operations {
                     "application/json": components["schemas"]["TaskOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8483,13 +10638,31 @@ export interface operations {
                     "application/json": components["schemas"]["TaskOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8517,13 +10690,31 @@ export interface operations {
                     "application/json": components["schemas"]["TimelineOut"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8548,13 +10739,31 @@ export interface operations {
                     "application/json": components["schemas"]["WebhookAccepted"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8579,13 +10788,31 @@ export interface operations {
                     "application/json": components["schemas"]["RunnerCredentials"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8612,13 +10839,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8639,6 +10884,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkItem"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8665,13 +10937,31 @@ export interface operations {
                     };
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8698,13 +10988,31 @@ export interface operations {
                     };
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8735,13 +11043,31 @@ export interface operations {
                     };
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8768,13 +11094,31 @@ export interface operations {
                     };
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8801,13 +11145,31 @@ export interface operations {
                     };
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8834,13 +11196,31 @@ export interface operations {
                     };
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8871,13 +11251,31 @@ export interface operations {
                     };
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8908,13 +11306,31 @@ export interface operations {
                     };
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8942,13 +11358,31 @@ export interface operations {
                     };
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8969,6 +11403,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KillSwitchOut"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8995,13 +11456,31 @@ export interface operations {
                     "application/json": components["schemas"]["KillSwitchOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9022,6 +11501,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnowledgeDocOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9048,13 +11554,31 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeDocOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9079,13 +11603,31 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeDocDetail"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9108,13 +11650,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9139,13 +11699,31 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeHit"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9170,13 +11748,31 @@ export interface operations {
                     "application/json": components["schemas"]["MaintenanceOut"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9203,13 +11799,31 @@ export interface operations {
                     "application/json": components["schemas"]["MaintenanceOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9232,13 +11846,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9259,6 +11891,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PermissionOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9283,13 +11942,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9310,6 +11987,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlatformTenantOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9336,13 +12040,31 @@ export interface operations {
                     "application/json": components["schemas"]["MspCreated"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9363,6 +12085,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlaybookOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9389,13 +12138,31 @@ export interface operations {
                     "application/json": components["schemas"]["PlaybookOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9420,13 +12187,31 @@ export interface operations {
                     "application/json": components["schemas"]["PlaybookOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9455,13 +12240,31 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowRunOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9490,13 +12293,31 @@ export interface operations {
                     "application/json": components["schemas"]["PlaybookOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9522,13 +12343,31 @@ export interface operations {
                     "application/json": components["schemas"]["PlaybookOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9549,6 +12388,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9575,13 +12441,31 @@ export interface operations {
                     "application/json": components["schemas"]["ReportOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9604,13 +12488,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9637,13 +12539,31 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9664,6 +12584,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RoleOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9690,13 +12637,31 @@ export interface operations {
                     "application/json": components["schemas"]["RoleOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9719,13 +12684,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9754,13 +12737,31 @@ export interface operations {
                     "application/json": components["schemas"]["RoleOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9786,13 +12787,31 @@ export interface operations {
                     "application/json": components["schemas"]["SearchOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9819,13 +12838,31 @@ export interface operations {
                     "application/json": components["schemas"]["EventSearchOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9846,6 +12883,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ServiceOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9870,13 +12934,31 @@ export interface operations {
                     "application/json": components["schemas"]["ServiceDetail"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9897,6 +12979,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SlaPolicy"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9923,13 +13032,31 @@ export interface operations {
                     "application/json": components["schemas"]["SlaPolicy"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9952,6 +13079,33 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     list_suppression_api_v1_suppression_rules_get: {
@@ -9970,6 +13124,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SuppressionOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -9996,13 +13177,31 @@ export interface operations {
                     "application/json": components["schemas"]["SuppressionOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -10025,13 +13224,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -10052,6 +13269,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TenantOut"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -10078,13 +13322,31 @@ export interface operations {
                     "application/json": components["schemas"]["TenantOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -10105,6 +13367,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemberOut"][];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -10131,13 +13420,31 @@ export interface operations {
                     "application/json": components["schemas"]["InviteResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -10162,13 +13469,31 @@ export interface operations {
                     "application/json": components["schemas"]["MemberOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -10191,13 +13516,31 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -10226,13 +13569,31 @@ export interface operations {
                     "application/json": components["schemas"]["MemberOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -10261,13 +13622,31 @@ export interface operations {
                     "application/json": components["schemas"]["MemberOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -10296,13 +13675,31 @@ export interface operations {
                     "application/json": components["schemas"]["VulnPage"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -10328,13 +13725,31 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowRunOut"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -10359,13 +13774,31 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowRunOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -10390,13 +13823,31 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowRunOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A dependency is not configured or not reachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };

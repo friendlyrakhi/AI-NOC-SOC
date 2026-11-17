@@ -1,0 +1,6 @@
+<!-- P7: native BACKUP/RESTORE may only read and write under the data volume's backups folder. -->
+<clickhouse>
+    <backups>
+        <allowed_path>/var/lib/clickhouse/backups/</allowed_path>
+    </backups>
+</clickhouse>

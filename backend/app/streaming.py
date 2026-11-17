@@ -14,6 +14,8 @@ from typing import Any, Literal
 from aiokafka import AIOKafkaProducer
 from pydantic import BaseModel, ConfigDict, Field
 
+from app import telemetry
+
 ALERTS_UPSERTED = "alerts.upserted"
 DEAD_LETTER = "dlq.raw"
 RAW_PREFIX = "raw."
@@ -93,7 +95,12 @@ class Publisher:
         await self._producer.client.fetch_all_metadata()
 
     async def publish(self, envelope: Envelope) -> None:
-        await self._producer.send_and_wait(raw_topic(envelope.connector), envelope.to_bytes(), key=envelope.key())
+        await self._producer.send_and_wait(
+            raw_topic(envelope.connector),
+            envelope.to_bytes(),
+            key=envelope.key(),
+            headers=telemetry.kafka_headers(),  # W3C trace context (NFR-6)
+        )
 
     async def publish_json(self, topic: str, key: str, value: dict[str, Any]) -> None:
         await self._producer.send_and_wait(topic, json.dumps(value, default=str).encode(), key=key.encode())

@@ -130,9 +130,14 @@ def test_privilege_escalation_blocked(api: Api) -> None:
     r = api.put(admin, f"/users/{eng_id}/roles", {"role_ids": [x["id"] for x in roles] + [role["id"]]})
     assert r.status_code == 200, r.text
     tenant_admin = next(x for x in api.get(admin, "/roles").json() if x["key"] == "tenant_admin")
-    r = api.post(
-        eng, "/users", {"email": "evil@globex.example", "display_name": "Evil", "role_ids": [tenant_admin["id"]]}
-    )
+    evil = {"email": "evil@globex.example", "display_name": "Evil", "role_ids": [tenant_admin["id"]]}
+    # P7: a privilege granted mid-session is withheld until the session is confirmed with MFA.
+    r = api.post(eng, "/users", evil)
+    assert r.status_code == 403 and r.json()["code"] == "auth.mfa_session_required"
+    # Even with an MFA session, the escalation guard refuses to hand out more than the caller holds.
+    with api.env.su() as c:
+        c.execute("UPDATE sessions SET mfa = true WHERE user_id = %s AND revoked_at IS NULL", (eng_id,))
+    r = api.post(eng, "/users", evil)
     assert r.status_code == 403
     assert r.json()["code"] == "authz.escalation"
 

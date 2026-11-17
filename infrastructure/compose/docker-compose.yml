@@ -1,6 +1,6 @@
 # Unified AI NOC & SOC platform: local development stack.
 # Profiles (docs/02-architecture.md §7): core (P0-P1), stream + analytics (P2). Later phases
-# add ai (P4), workflow (P5), search (P6), observability (P7).
+# add ai (P4), workflow (P5), search (P6), observability (P7). `tools` holds one-shot jobs.
 #   stream:    Redpanda, ClickHouse, stream setup, ingest worker, connector runner
 #   analytics: ClickHouse only (event search without ingestion)
 #
@@ -123,12 +123,15 @@ services:
   api:
     <<: *hardening
     profiles: [core]
-    networks: [data, bus, frontend, ai, workflow, search]
+    networks: [data, bus, frontend, ai, workflow, search, telemetry]
     build:
       context: ../..
       dockerfile: infrastructure/docker/api.Dockerfile
       secrets: [build_extra_ca]
     image: nocsoc/api:dev
+    # P7 (NFR-1 load test): several worker processes; one Python process saturated one core at ~55 req/s.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-server-header",
+              "--workers", "${NOCSOC_API_WORKERS:-4}"]
     environment:
       NOCSOC_ENVIRONMENT: dev
       NOCSOC_EXECUTION_MODE: simulate
@@ -147,6 +150,16 @@ services:
       NOCSOC_TEMPORAL_ADDRESS: temporal:7233
       # Optional (search profile). Without it global search uses Postgres and hunts answer 503.
       NOCSOC_OPENSEARCH_URL: http://opensearch:9200
+      # Optional SSO (sso profile; scripts/dev sets NOCSOC_OIDC_ENABLED). Users must already exist.
+      NOCSOC_OIDC_ENABLED: ${NOCSOC_OIDC_ENABLED:-false}
+      NOCSOC_OIDC_DISPLAY_NAME: Keycloak (DEMO)
+      NOCSOC_OIDC_ISSUER: http://127.0.0.1:${NOCSOC_KEYCLOAK_PORT:-8180}/realms/nocsoc
+      NOCSOC_OIDC_DISCOVERY_URL: http://keycloak:8080/realms/nocsoc/.well-known/openid-configuration
+      NOCSOC_OIDC_IDP_ENFORCES_MFA: "true"
+      # Observability profile (P7): OTLP to otel-lgtm when NOCSOC_OTEL_ENABLED=true (scripts/dev sets it).
+      NOCSOC_OTEL_ENABLED: ${NOCSOC_OTEL_ENABLED:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
+      OTEL_SEMCONV_STABILITY_OPT_IN: http
     # File names carry the settings prefix: pydantic-settings maps NOCSOC_<FIELD> to them.
     secrets:
       - source: ai_gateway_token
@@ -167,12 +180,15 @@ services:
         target: nocsoc_clickhouse_reader_password
       - source: opensearch_reader_password
         target: nocsoc_opensearch_reader_password
+      - source: oidc_client_secret
+        target: nocsoc_oidc_client_secret
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
     depends_on:
       migrate: { condition: service_completed_successfully }
       valkey: { condition: service_healthy }
+      opensearch-setup: { condition: service_completed_successfully, required: false }
     ports:
       - "127.0.0.1:${NOCSOC_API_PORT:-8100}:8000"
     healthcheck:
@@ -181,7 +197,126 @@ services:
       timeout: 5s
       retries: 12
       start_period: 10s
-    mem_limit: 512m
+    mem_limit: 1g
+
+  # Audit anchors (P7, threat model T28): signs each audit chain's head into an append-only file
+  # on a volume that only this service writes. Worker DB role; it can call audit_heads() and
+  # audit_hash_at() but cannot read audit content. The API never sees the key or the volume.
+  audit-anchor:
+    <<: *hardening
+    profiles: [core]
+    networks: [data, telemetry]
+    image: nocsoc/api:dev
+    command: ["python", "-m", "app.workers.anchor"]
+    environment:
+      NOCSOC_DATABASE_HOST: postgres
+      # Observability profile (P7): OTLP to otel-lgtm when NOCSOC_OTEL_ENABLED=true (scripts/dev sets it).
+      NOCSOC_OTEL_ENABLED: ${NOCSOC_OTEL_ENABLED:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
+      OTEL_SEMCONV_STABILITY_OPT_IN: http
+    secrets:
+      - source: worker_database_password
+        target: nocsoc_worker_database_password
+      - source: audit_anchor_key
+        target: nocsoc_audit_anchor_key
+    volumes:
+      - auditanchors:/var/lib/nocsoc/anchors
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    mem_limit: 128m
+
+  # One-shot (scripts/verify-audit): recomputes every chain and checks it against the anchors.
+  audit-verify:
+    <<: *hardening
+    restart: "no"
+    profiles: [tools]
+    networks: [data]
+    image: nocsoc/api:dev
+    command: ["python", "-m", "app.tools.verify_audit"]
+    environment:
+      NOCSOC_DATABASE_HOST: postgres
+    secrets:
+      - source: postgres_password
+        target: nocsoc_postgres_password
+      - source: audit_anchor_key
+        target: nocsoc_audit_anchor_key
+    volumes:
+      - auditanchors:/var/lib/nocsoc/anchors:ro
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    mem_limit: 128m
+
+  # Observability (P7, NFR-6): OpenTelemetry collector, Prometheus, Tempo, Loki and Grafana in one
+  # container (grafana/otel-lgtm v0.41.0). Services send OTLP over the internal `telemetry`
+  # network. Grafana is published on loopback only; anonymous visitors are Viewers, and the admin
+  # password comes from a secret. Platform dashboards and SLO rules come from the repository.
+  otel-lgtm:
+    <<: *hardening
+    profiles: [observability]
+    networks: [telemetry]
+    image: grafana/otel-lgtm@sha256:2e3290657f2f2a256c7a9175f097424a3ac5b54840741ace433e108e109348b6
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+    secrets: [grafana_admin_password]
+    volumes:
+      - lgtmdata:/data
+      - ../observability/prometheus.yaml:/otel-lgtm/prometheus.yaml:ro
+      - ../observability/rules.yaml:/otel-lgtm/nocsoc-rules.yaml:ro
+      - ../observability/grafana-dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/nocsoc.yaml:ro
+      - ../observability/dashboards:/otel-lgtm/nocsoc-dashboards:ro
+    ports:
+      - "127.0.0.1:${NOCSOC_GRAFANA_PORT:-3001}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3000/api/health >/dev/null && curl -sf http://127.0.0.1:13133/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    mem_limit: 2g
+
+  # Optional SSO (P7, D7): Keycloak 26.4 dev server with a DEMO realm (two users matching seeded
+  # accounts, OTP required at first sign-in). The API validates its tokens; nobody is provisioned by it.
+  # Secrets are read from files inside the container, never from compose environment values.
+  keycloak:
+    <<: *hardening
+    profiles: [sso]
+    networks: [frontend]
+    image: quay.io/keycloak/keycloak@sha256:9409c59bdfb65dbffa20b11e6f18b8abb9281d480c7ca402f51ed3d5977e6007
+    entrypoint:
+      - bash
+      - -c
+      - >-
+        export NOCSOC_OIDC_CLIENT_SECRET="$$(cat /run/secrets/oidc_client_secret)"
+        NOCSOC_SSO_DEMO_PASSWORD="$$(cat /run/secrets/sso_demo_password)"
+        KC_BOOTSTRAP_ADMIN_PASSWORD="$$(cat /run/secrets/keycloak_admin_password)" &&
+        exec /opt/keycloak/bin/kc.sh start-dev --import-realm
+    environment:
+      KC_HOSTNAME: http://127.0.0.1:${NOCSOC_KEYCLOAK_PORT:-8180}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: kcadmin
+      JAVA_OPTS_KC_HEAP: -Xms256m -Xmx512m
+    secrets: [oidc_client_secret, sso_demo_password, keycloak_admin_password]
+    volumes:
+      - ./keycloak/nocsoc-realm.json:/opt/keycloak/data/import/nocsoc-realm.json:ro
+    ports:
+      - "127.0.0.1:${NOCSOC_KEYCLOAK_PORT:-8180}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    mem_limit: 1g
 
   ai-gateway:
     <<: *hardening
@@ -243,6 +378,8 @@ services:
       OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
       plugins.security.ssl.http.enabled: "false"
       DISABLE_PERFORMANCE_ANALYZER_AGENT_CLI: "true"
+      # Snapshot repository for backups (P7, scripts/backup.py), inside the data volume.
+      path.repo: /usr/share/opensearch/data/snapshots
     secrets: [opensearch_admin_password]
     volumes:
       - osdata:/usr/share/opensearch/data
@@ -285,7 +422,7 @@ services:
   workflow-worker:
     <<: *hardening
     profiles: [workflow]
-    networks: [workflow]
+    networks: [workflow, telemetry]
     build:
       context: ../..
       dockerfile: infrastructure/docker/workflow-worker.Dockerfile
@@ -294,6 +431,8 @@ services:
     environment:
       NOCSOC_API_URL: http://api:8000
       NOCSOC_TEMPORAL_ADDRESS: temporal:7233
+      NOCSOC_OTEL_ENABLED: ${NOCSOC_OTEL_ENABLED:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
     # Only the workflow token: no database, bus, valkey or AI credentials.
     secrets:
       - source: workflow_token
@@ -383,6 +522,9 @@ services:
     secrets: [clickhouse_admin_password]
     volumes:
       - clickhousedata:/var/lib/clickhouse
+      # Backups (P7, scripts/backup.py): native BACKUP may write only under
+      # /var/lib/clickhouse/backups (inside the data volume, owned by the server user).
+      - ./clickhouse/backups.xml:/etc/clickhouse-server/config.d/backups.xml:ro
     ports:
       - "127.0.0.1:${NOCSOC_CLICKHOUSE_PORT:-8123}:8123"
     ulimits:
@@ -424,7 +566,7 @@ services:
   ingest-worker:
     <<: *hardening
     profiles: [stream]
-    networks: [data, bus, search]
+    networks: [data, bus, search, telemetry]
     image: nocsoc/api:dev
     command: ["python", "-m", "app.workers.ingest"]
     environment:
@@ -434,6 +576,12 @@ services:
       NOCSOC_VALKEY_HOST: valkey
       # Optional (search profile): indexes canonical events and runs the search projection.
       NOCSOC_OPENSEARCH_URL: http://opensearch:9200
+      # Per-tenant ingest quota (records/minute); scripts/loadtest.py raises it for a run.
+      NOCSOC_TENANT_INGEST_RECORDS_PER_MINUTE: ${NOCSOC_TENANT_INGEST_RECORDS_PER_MINUTE:-6000}
+      # Observability profile (P7): OTLP to otel-lgtm when NOCSOC_OTEL_ENABLED=true (scripts/dev sets it).
+      NOCSOC_OTEL_ENABLED: ${NOCSOC_OTEL_ENABLED:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
+      OTEL_SEMCONV_STABILITY_OPT_IN: http
     # Least privilege: the RLS-bound worker role and the INSERT-only ClickHouse user. Valkey
     # carries live-update notifications and per-tenant ingest quotas.
     secrets:
@@ -451,6 +599,8 @@ services:
     depends_on:
       migrate-stream: { condition: service_completed_successfully }
       valkey: { condition: service_healthy }
+      # Search profile only: start after the indexer user exists (no startup projection warnings).
+      opensearch-setup: { condition: service_completed_successfully, required: false }
     mem_limit: 384m
 
   connector-runner:
@@ -511,6 +661,16 @@ secrets:
     file: ../secrets/opensearch_reader_password
   opensearch_indexer_password:
     file: ../secrets/opensearch_indexer_password
+  audit_anchor_key:
+    file: ../secrets/audit_anchor_key
+  grafana_admin_password:
+    file: ../secrets/grafana_admin_password
+  oidc_client_secret:
+    file: ../secrets/oidc_client_secret
+  sso_demo_password:
+    file: ../secrets/sso_demo_password
+  keycloak_admin_password:
+    file: ../secrets/keycloak_admin_password
 
 # Segmentation (threat model T13, SEC-CON-02): the connector runner reaches only the API and
 # the event bus. Data stores sit on `data`, which the runner is not attached to.
@@ -529,9 +689,15 @@ networks:
   # OpenSearch, its setup job, the API (reader) and the ingest worker (indexer).
   search:
     internal: true
+  # OTLP from the platform services to otel-lgtm (observability profile). No internet.
+  telemetry:
+    internal: true
 
 volumes:
+  # Audit anchors: back this up separately from the database (scripts/backup copies it).
+  auditanchors:
   osdata:
+  lgtmdata:
   temporaldata:
   pgdata:
   redpandadata:

@@ -44,6 +44,10 @@ def test_public_routes_are_the_expected_few(api: Api) -> None:
         "POST /api/v1/auth/mfa/enroll",
         "POST /api/v1/auth/mfa/confirm",
         "POST /api/v1/auth/invitations/accept",
+        # Optional SSO (P7): state, nonce and PKCE are validated server-side; rate-limited per IP.
+        "GET /api/v1/auth/oidc/config",
+        "POST /api/v1/auth/oidc/start",
+        "POST /api/v1/auth/oidc/callback",
     }
 
 

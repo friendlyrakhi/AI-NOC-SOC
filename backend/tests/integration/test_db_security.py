@@ -60,13 +60,14 @@ TENANT_SCOPED = {
     "approvals",
     "tenant_kill_switches",
     "projection_state",
+    "telemetry_outbox",
     "reports",
     "hunts",
     "hunt_runs",
 }
-IDENTITY_ONLY = {"user_credentials", "sessions", "auth_challenges", "invitations"}  # no app policies
+IDENTITY_ONLY = {"user_credentials", "sessions", "auth_challenges", "invitations", "oidc_states"}  # no app policies
 GLOBAL = {"permissions", "alembic_version", "global_kill_switch"}
-WORKER_ONLY = {"ingest_seen", "projection_state"}  # the app role has no grant at all
+WORKER_ONLY = {"ingest_seen", "projection_state", "telemetry_outbox"}  # the app role has no grant at all
 AGGREGATE_READABLE = {"tenants", "audit_log", "alerts", "assets", "vuln_findings", "incidents", "services"}
 
 

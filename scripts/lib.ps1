@@ -36,11 +36,10 @@ function Invoke-Uv {
     Invoke-Checked $uv @args
 }
 
-function Get-ComposeArgs {
+function Get-ComposeArgs([switch]$Hardened) {
     $root = Get-RepoRoot
-    return @(
-        'compose',
-        '-f', (Join-Path $root 'infrastructure\compose\docker-compose.yml'),
-        '--env-file', (Join-Path $root '.env')
-    )
+    $files = @('-f', (Join-Path $root 'infrastructure\compose\docker-compose.yml'))
+    # P7 hardened profile: TLS between services, secure cookies, OpenBao (docs/operations/hardened.md).
+    if ($Hardened) { $files += @('-f', (Join-Path $root 'infrastructure\compose\hardened.override.yml')) }
+    return @('compose') + $files + @('--env-file', (Join-Path $root '.env'))
 }

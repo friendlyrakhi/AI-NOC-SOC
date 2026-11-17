@@ -17,7 +17,9 @@ async def main() -> None:
     settings = RunnerSettings()
     if settings.runner_token is None:
         raise SystemExit("runner token secret (nocsoc_runner_token) is required")
-    api = HttpPlatformApi(settings.api_url, settings.runner_token.get_secret_value())
+    api = HttpPlatformApi(
+        settings.api_url, settings.runner_token.get_secret_value(), verify=settings.tls_ca_file or True
+    )
     bus = KafkaBus(settings.kafka_bootstrap)
     for attempt in range(30):
         try:

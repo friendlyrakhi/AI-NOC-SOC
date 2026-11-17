@@ -2,7 +2,8 @@
 
 Usage: python scripts/check-compose.py [--env-file PATH]
 
-Renders infrastructure/compose/docker-compose.yml with every profile enabled.
+Renders infrastructure/compose/docker-compose.yml with every profile enabled, on its own and with
+the hardened override (P7), and checks both.
 
 Fails when any service publishes a port on a non-loopback address, runs privileged,
 mounts the Docker socket, adds capabilities, or passes secrets as environment values, or
@@ -19,6 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 COMPOSE_FILE = ROOT / "infrastructure" / "compose" / "docker-compose.yml"
+HARDENED_FILE = ROOT / "infrastructure" / "compose" / "hardened.override.yml"
 
 SECRET_ENV = re.compile(r"(PASSWORD|SECRET|TOKEN|API_?KEY)(?!_FILE)$", re.IGNORECASE)
 
@@ -48,6 +50,49 @@ def check(config: dict) -> list[str]:
     problems += check_isolation(config)
     problems += check_ai_isolation(config)
     problems += check_search_isolation(config)
+    problems += check_anchor_isolation(config)
+    problems += check_telemetry_isolation(config)
+    return problems
+
+
+# Observability (P7): only these services send telemetry; the backend has no internet.
+TELEMETRY_MEMBERS = {"otel-lgtm", "api", "ingest-worker", "audit-anchor", "workflow-worker"}
+
+
+def check_telemetry_isolation(config: dict) -> list[str]:
+    services = config.get("services", {})
+    if "otel-lgtm" not in services:
+        return []
+    problems = []
+    if not (config.get("networks", {}).get("telemetry") or {}).get("internal"):
+        problems.append("network 'telemetry' must be internal (no internet)")
+    if _networks(services["otel-lgtm"]) != {"telemetry"}:
+        problems.append("otel-lgtm: must be attached only to network 'telemetry'")
+    for name, svc in services.items():
+        if "telemetry" in _networks(svc) and name not in TELEMETRY_MEMBERS:
+            problems.append(f"{name}: must not join the 'telemetry' network")
+    return problems
+
+
+# Audit anchors (P7, T28): only the anchor service writes the anchor volume and holds the key;
+# the verifier reads it. The API and everything else must not see either.
+ANCHOR_KEY_HOLDERS = {"audit-anchor", "audit-verify"}
+ANCHOR_VOLUME = "auditanchors"
+
+
+def check_anchor_isolation(config: dict) -> list[str]:
+    problems = []
+    for name, svc in config.get("services", {}).items():
+        for secret in svc.get("secrets") or []:
+            if secret.get("source") == "audit_anchor_key" and name not in ANCHOR_KEY_HOLDERS:
+                problems.append(f"{name}: must not hold audit_anchor_key")
+        for vol in svc.get("volumes") or []:
+            if vol.get("source") != ANCHOR_VOLUME:
+                continue
+            if name not in ANCHOR_KEY_HOLDERS:
+                problems.append(f"{name}: must not mount the audit anchor volume")
+            elif name != "audit-anchor" and not vol.get("read_only"):
+                problems.append(f"{name}: must mount the audit anchor volume read-only")
     return problems
 
 
@@ -83,7 +128,8 @@ def check_isolation(config: dict) -> list[str]:
 
 # The AI gateway may talk to the API only (LLM06, T21): one internal network, one secret.
 AI_RUNTIMES = {"ai-gateway"}
-AI_ALLOWED_SECRETS = {"ai_gateway_token", "anthropic_api_key"}
+# TLS material (hardened profile) grants no data access.
+AI_ALLOWED_SECRETS = {"ai_gateway_token", "anthropic_api_key", "tls_ca", "ai_gateway_tls_crt", "ai_gateway_tls_key"}
 
 
 def check_ai_isolation(config: dict) -> list[str]:
@@ -142,16 +188,16 @@ def check_search_isolation(config: dict) -> list[str]:
     return problems
 
 
-def render(env_file: Path) -> dict:
+def render(env_file: Path, *extra: Path) -> dict:
     docker = shutil.which("docker")
     if docker is None:
         raise SystemExit("docker not found on PATH")
+    files = [a for f in (COMPOSE_FILE, *extra) for a in ("-f", str(f))]
     out = subprocess.run(  # noqa: S603  # nosec B603: fixed argv, no shell
         [
             docker,
             "compose",
-            "-f",
-            str(COMPOSE_FILE),
+            *files,
             "--env-file",
             str(env_file),
             "--profile",
@@ -171,14 +217,42 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     default_env = ROOT / ".env" if (ROOT / ".env").exists() else ROOT / ".env.example"
     parser.add_argument("--env-file", type=Path, default=default_env)
-    config = render(parser.parse_args().env_file)
-    problems = check(config)
-    for p in problems:
-        print(f"FAIL {p}")
-    if problems:
-        return 1
-    print(f"compose policy OK ({len(config.get('services', {}))} services)")
-    return 0
+    env_file = parser.parse_args().env_file
+    failed = False
+    for label, extra in (("default", ()), ("hardened", (HARDENED_FILE,))):
+        config = render(env_file, *extra)
+        problems = check(config) + (check_hardened(config) if extra else [])
+        for p in problems:
+            print(f"FAIL [{label}] {p}")
+        failed = failed or bool(problems)
+        if not problems:
+            print(f"compose policy OK [{label}] ({len(config.get('services', {}))} services)")
+    return 1 if failed else 0
+
+
+# Hardened profile (P7): OpenBao and its AppRole are reachable only by the services that need them,
+# and the web app is reachable only through the TLS edge.
+SECRETS_MEMBERS = {"openbao", "openbao-setup", "api", "migrate"}
+
+
+def check_hardened(config: dict) -> list[str]:
+    services = config.get("services", {})
+    problems = []
+    if not (config.get("networks", {}).get("secrets") or {}).get("internal"):
+        problems.append("network 'secrets' must be internal (no internet)")
+    for name, svc in services.items():
+        if "secrets" in _networks(svc) and name not in SECRETS_MEMBERS:
+            problems.append(f"{name}: must not join the 'secrets' network")
+        for vol in svc.get("volumes") or []:
+            if vol.get("source") == "baoinit" and name != "openbao-setup":
+                problems.append(f"{name}: must not mount the OpenBao init volume")
+            if vol.get("source") == "baoapprole" and name not in SECRETS_MEMBERS - {"openbao"}:
+                problems.append(f"{name}: must not mount the OpenBao AppRole volume")
+    if services.get("web", {}).get("ports"):
+        problems.append("web: must not publish ports in the hardened profile (use the TLS edge)")
+    if services.get("web", {}).get("environment", {}).get("NOCSOC_COOKIE_SECURE") != "true":
+        problems.append("web: session cookies must be Secure in the hardened profile")
+    return problems
 
 
 if __name__ == "__main__":

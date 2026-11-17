@@ -14,6 +14,7 @@ from app.core.authz.deps import get_principal, requires
 from app.core.authz.principal import Principal
 from app.core.identity.service import IdentityService
 from app.core.tenancy.common import record, tenant_tx
+from app.core.types import IsoDatetime, StrictBool
 from app.errors import ProblemError, forbidden, not_found
 from app.services import Services, get_services
 
@@ -41,8 +42,8 @@ class CustomerOut(BaseModel):
 class DelegationSpec(BaseModel):
     msp_role_id: UUID
     customer_role_key: str = Field(pattern=r"^[a-z][a-z0-9_]{1,62}$")
-    aggregate_read: bool = True
-    expires_at: datetime | None = None
+    aggregate_read: StrictBool = True
+    expires_at: IsoDatetime | None = None
 
 
 class CustomerCreate(BaseModel):

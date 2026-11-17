@@ -46,6 +46,7 @@ dev = [
   "bandit>=1.8",
   "pip-audit>=2.7",
   "pre-commit>=4",
+  "schemathesis>=4.33.4",
 ]
 
 # ---------- ruff ----------
@@ -77,6 +78,10 @@ known-first-party = ["app", "nocsoc_connector_sdk", "nocsoc_connectors", "connec
 "backend/app/reports.py" = ["S608"]
 "backend/app/hunting.py" = ["S608"]
 "backend/app/projector.py" = ["S608"]
+# Fixed table names in shell-quoted SQL for psql/clickhouse-client (no user input).
+"scripts/backup.py" = ["S608"]
+# Embedded SQL and the in-container probe script.
+"scripts/verify_hardened.py" = ["E501", "S603", "S607"]
 # Vendor-shaped sandbox payload literals read best on one line each.
 "connectors/catalog/src/nocsoc_connectors/**" = ["E501"]
 
@@ -99,9 +104,12 @@ ignore_missing_imports = true
 # ---------- pytest ----------
 [tool.pytest.ini_options]
 testpaths = ["backend/tests", "connectors/sdk/tests", "connectors/catalog/tests", "connectors/runner/tests", "ai-engine/gateway/tests", "ai-engine/evals", "tests"]
-addopts = "-ra --strict-markers --import-mode=importlib"
+addopts = "-ra --strict-markers --import-mode=importlib -m 'not fuzz'"
 pythonpath = ["backend/tests", "ai-engine/evals"]
-markers = ["integration: needs Docker (Postgres, Valkey; ingestion tests also Redpanda and ClickHouse)"]
+markers = [
+  "integration: needs Docker (Postgres, Valkey; ingestion tests also Redpanda and ClickHouse)",
+  "fuzz: Schemathesis API fuzzing against the full test stack (run with -m fuzz; CI gate 'fuzz')",
+]
 
 # ---------- import-linter (module boundaries, NFR-10) ----------
 [tool.importlinter]

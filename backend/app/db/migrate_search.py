@@ -17,7 +17,9 @@ logger = logging.getLogger("app.db.migrate_search")
 
 
 async def wait_for_cluster(url: str, admin_password: str, attempts: int = 90) -> None:
-    async with httpx.AsyncClient(base_url=url, auth=("admin", admin_password), timeout=10) as c:
+    async with httpx.AsyncClient(
+        base_url=url, auth=("admin", admin_password), timeout=10, verify=get_settings().tls_ca_file or True
+    ) as c:
         for attempt in range(attempts):
             try:
                 r = await c.get("/_cluster/health", params={"wait_for_status": "yellow", "timeout": "5s"})
@@ -47,6 +49,7 @@ async def run(settings: Settings) -> None:
             "nocsoc_reader": settings.opensearch_reader_password.get_secret_value(),
             "nocsoc_indexer": settings.opensearch_indexer_password.get_secret_value(),
         },
+        verify=settings.tls_ca_file or True,
     )
     logger.info("opensearch templates, retention policy and service users ready")
 

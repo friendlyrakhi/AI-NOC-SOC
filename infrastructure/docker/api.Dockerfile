@@ -45,6 +45,9 @@ ENV PATH="/src/.venv/bin:$PATH" \
     PYTHONPATH=/src/backend:/src/connectors/sdk/src:/src/connectors/catalog/src \
     PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /src/backend
+# Mount points for named volumes (P7): audit anchors, and the hardened profile's OpenBao init and
+# AppRole volumes. A fresh named volume inherits the ownership of its mount point.
+RUN mkdir -p /var/lib/nocsoc/anchors /var/lib/openbao-init /run/openbao     && chown 10001:10001 /var/lib/nocsoc/anchors /var/lib/openbao-init /run/openbao     && chmod 0700 /var/lib/openbao-init
 USER 10001
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-server-header"]

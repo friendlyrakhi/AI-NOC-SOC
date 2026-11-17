@@ -1,0 +1,11 @@
+# Hardened profile (P7): TLS for the browser on https://127.0.0.1:3443 (trust infrastructure/secrets/tls/ca.crt).
+{
+	auto_https off
+	admin off
+}
+
+https://:3443 {
+	tls /run/secrets/edge_tls_crt /run/secrets/edge_tls_key
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy web:3000
+}

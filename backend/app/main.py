@@ -3,6 +3,7 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 
@@ -13,6 +14,7 @@ from app.ai.knowledge import router as knowledge_router
 from app.ai.router import router as ai_router
 from app.alerts.router import router as alerts_router
 from app.config import Settings, get_settings
+from app.core.authz.deps import SECURITY_SCHEMES
 from app.core.identity.router import router as auth_router
 from app.core.msp.router import router as msp_router
 from app.core.tenancy.platform import router as platform_router
@@ -65,6 +67,16 @@ def create_app(settings: Settings | None = None, *, mailer: Mailer | None = None
     )
     app.state.settings = settings
     errors.install(app)
+    default_openapi = app.openapi
+
+    def openapi_with_security() -> dict[str, Any]:
+        if app.openapi_schema is None:
+            schema = default_openapi()
+            schema.setdefault("components", {})["securitySchemes"] = SECURITY_SCHEMES
+            errors.document_problems(schema)
+        return app.openapi_schema  # type: ignore[return-value]
+
+    app.openapi = openapi_with_security  # type: ignore[method-assign]
     for router in (
         health_router,
         auth_router,

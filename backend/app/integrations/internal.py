@@ -24,6 +24,7 @@ from sqlalchemy import text
 
 from app.core.authz.deps import internal, webhook_hmac
 from app.core.secrets import SecretDecryptionError
+from app.core.types import IsoDatetime, StrictInt
 from app.errors import ProblemError, not_found
 from app.ingestion.limits import MAX_DEPTH, json_depth
 from app.integrations.common import build, decrypt_credentials, publish_records, webhook_aad
@@ -60,13 +61,13 @@ class RunReport(BaseModel):
     stream: str = Field(max_length=64)
     trigger: Literal["schedule", "manual"]
     status: Literal["succeeded", "failed"]
-    records: int = Field(ge=0)
+    records: StrictInt = Field(ge=0)
     error_class: str | None = Field(default=None, max_length=100)
     error_detail: str | None = Field(default=None, max_length=1000)
     health: Literal["healthy", "degraded", "failing"]
     cursor: dict[str, Any] | None = None
-    started_at: datetime
-    finished_at: datetime
+    started_at: IsoDatetime
+    finished_at: IsoDatetime
 
 
 @router.get("/internal/runner/work", response_model=list[WorkItem], **internal())

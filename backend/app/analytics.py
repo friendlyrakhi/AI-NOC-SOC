@@ -108,7 +108,15 @@ async def _client(settings: Settings, user: str, password: str | None) -> AsyncC
         database=settings.clickhouse_database,
         connect_timeout=5,
         send_receive_timeout=30,
+        **tls_options(settings),
     )
+
+
+def tls_options(settings: Settings) -> dict[str, Any]:
+    """HTTPS with certificate verification in the hardened profile."""
+    if not settings.clickhouse_secure:
+        return {}
+    return {"secure": True, "verify": True, "ca_cert": settings.tls_ca_file}
 
 
 async def ingest_client(settings: Settings) -> AsyncClient:

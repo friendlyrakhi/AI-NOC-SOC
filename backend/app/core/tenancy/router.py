@@ -25,6 +25,7 @@ from app.core.tenancy.common import (
     role_permission_sets,
     tenant_tx,
 )
+from app.core.types import PG_BIGINT_MAX, StrictInt
 from app.errors import ProblemError, not_found
 from app.services import Services, get_services
 
@@ -400,7 +401,7 @@ class ApiKeyOut(BaseModel):
 class ApiKeyCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     permissions: list[str] = Field(min_length=1, max_length=len(PERMISSIONS))
-    expires_in_days: int = Field(default=90, ge=1, le=365)
+    expires_in_days: StrictInt = Field(default=90, ge=1, le=365)
 
 
 class ApiKeyCreated(ApiKeyOut):
@@ -503,7 +504,7 @@ async def list_audit(
     services: Svc,
     p: P,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
-    before: Annotated[int | None, Query(ge=1)] = None,
+    before: Annotated[int | None, Query(ge=1, le=PG_BIGINT_MAX)] = None,
     action: Annotated[str | None, Query(max_length=100, pattern=r"^[a-z0-9_.]+$")] = None,
 ) -> list[AuditOut]:
     async with tenant_tx(services, p) as conn:

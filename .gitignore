@@ -44,3 +44,10 @@ infrastructure/certs/*.pem
 # Playwright
 test-results/
 playwright-report/
+
+# --- generated reports (DAST, load tests, backups) ---
+reports/
+backups/
+
+# Playwright: Keycloak OTP secret saved by the SSO journey (DEMO realm)
+tests/e2e/.auth/

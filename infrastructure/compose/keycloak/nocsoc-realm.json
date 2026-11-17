@@ -1,0 +1,55 @@
+{
+  "realm": "nocsoc",
+  "displayName": "NOC/SOC platform (DEMO identity provider)",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "bruteForceProtected": true,
+  "failureFactor": 10,
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "accessTokenLifespan": 300,
+  "clients": [
+    {
+      "clientId": "nocsoc-web",
+      "name": "NOC/SOC platform",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${NOCSOC_OIDC_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://127.0.0.1:3000/login/sso/callback", "https://127.0.0.1:3443/login/sso/callback"],
+      "webOrigins": [],
+      "attributes": { "pkce.code.challenge.method": "S256" }
+    }
+  ],
+  "users": [
+    {
+      "username": "admin@globex.example",
+      "email": "admin@globex.example",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Gail",
+      "lastName": "Admin",
+      "credentials": [{ "type": "password", "value": "${NOCSOC_SSO_DEMO_PASSWORD}", "temporary": false }],
+      "requiredActions": ["CONFIGURE_TOTP"]
+    },
+    {
+      "username": "soc@initech.example",
+      "email": "soc@initech.example",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Ivy",
+      "lastName": "Responder",
+      "credentials": [{ "type": "password", "value": "${NOCSOC_SSO_DEMO_PASSWORD}", "temporary": false }],
+      "requiredActions": ["CONFIGURE_TOTP"]
+    }
+  ]
+}

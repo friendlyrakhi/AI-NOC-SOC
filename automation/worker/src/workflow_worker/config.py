@@ -21,3 +21,7 @@ class WorkerSettings(BaseSettings):
     workflow_token: SecretStr | None = None
     temporal_address: str = "temporal:7233"
     temporal_namespace: str = "default"
+    # Observability profile (P7): spans over OTLP (standard OTEL_EXPORTER_OTLP_* variables).
+    otel_enabled: bool = False
+    # Hardened profile: CA bundle for the API's TLS certificate.
+    tls_ca_file: str | None = None

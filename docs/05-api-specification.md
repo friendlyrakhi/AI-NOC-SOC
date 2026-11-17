@@ -224,6 +224,21 @@ AI response shape:
 - AI: `POST /ai/briefing` (`ai:use` + `analytics:read` + `incident:read`) and `GET /ai/briefing/latest` (`analytics:read`).
 - `/metrics/query` is deferred (no consumer yet).
 
+**As built in P7:**
+- Every operation declares its authentication in OpenAPI (`bearerAuth`, `runnerToken`, `workflowToken`, or none for the public sign-in steps and webhooks). Every error is documented as `application/problem+json` (RFC 9457 `Problem`, with a stable `code`).
+- Request models are strict: booleans must be JSON booleans, integers JSON integers, and date-times ISO-8601 strings (numbers are refused). Integer cursors are bounded.
+- Sessions:
+  - New error `403 auth.mfa_session_required`: the session was not established with MFA. Step up or sign in again.
+  - `/auth/me` adds `withheld_permissions`.
+- Optional OIDC (`sso` profile):
+  - `GET /auth/oidc/config` returns `{enabled, display_name}`.
+  - `POST /auth/oidc/start` returns `{authorization_url}`.
+  - `POST /auth/oidc/callback {code, state}` returns `{session_token}`.
+  - Errors: `auth.oidc_failed` (401), `auth.oidc_no_account` (403), `auth.oidc_disabled` (404), `auth.oidc_unavailable` (503). All three routes are public and rate-limited per IP.
+- Limits:
+  - `GET /stream` answers `429 stream.limit` over 100 concurrent streams per tenant or 6 per user.
+  - AI endpoints answer `429 ai.rate_limited` over 120 requests per user per hour.
+
 ### 2.11 Audit & admin
 | Method | Path | Perm |
 |--------|------|------|

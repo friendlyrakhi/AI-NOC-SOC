@@ -20,6 +20,7 @@ from sqlalchemy import text
 from app.core.authz.deps import get_principal, requires
 from app.core.authz.principal import Principal
 from app.core.tenancy.common import record, tenant_tx
+from app.core.types import IsoDatetime, StrictInt
 from app.errors import not_found
 from app.services import Services, get_services
 
@@ -179,8 +180,8 @@ class MaintenanceCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     asset_ids: list[UUID] = Field(default_factory=list, max_length=200)
     service_ids: list[UUID] = Field(default_factory=list, max_length=50)
-    starts_at: datetime
-    ends_at: datetime
+    starts_at: IsoDatetime
+    ends_at: IsoDatetime
     reason: str = Field(default="", max_length=1000)
 
     @model_validator(mode="after")
@@ -308,7 +309,7 @@ class SuppressionCreate(BaseModel):
     match: SuppressionMatch
     reason: str = Field(min_length=1, max_length=1000)
     # Suppression always expires; permanent noise should be fixed at the source.
-    expires_in_hours: int = Field(default=24, ge=1, le=24 * 30)
+    expires_in_hours: StrictInt = Field(default=24, ge=1, le=24 * 30)
 
 
 class SuppressionOut(BaseModel):

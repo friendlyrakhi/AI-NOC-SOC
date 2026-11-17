@@ -18,6 +18,7 @@ from uuid import UUID
 from fastapi import Depends, Request
 
 from app.core.authz import service as authz
+from app.core.authz.catalog import PRIVILEGED
 from app.core.authz.principal import Principal
 from app.core.identity.service import IdentityService, SessionInfo
 from app.errors import ProblemError, forbidden, unauthorized
@@ -28,6 +29,19 @@ AUTHENTICATED = "authenticated"
 PLATFORM_ADMIN = "platform_admin"
 INTERNAL = "internal"
 WEBHOOK_HMAC = "webhook_hmac"
+
+# OpenAPI security requirements (P7): every operation declares how it is authenticated, so
+# clients, DAST and the fuzzer know which calls must be refused without credentials.
+BEARER: list[dict[str, list[str]]] = [{"bearerAuth": []}]
+SECURITY_SCHEMES: dict[str, dict[str, str]] = {
+    "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "A session token from the sign-in flow (held by the web BFF), or a tenant API key.",
+    },
+    "runnerToken": {"type": "apiKey", "in": "header", "name": "X-Runner-Token"},
+    "workflowToken": {"type": "apiKey", "in": "header", "name": "X-Workflow-Token"},
+}
 
 
 def client_ip(request: Request) -> str | None:
@@ -115,12 +129,18 @@ async def get_principal(request: Request, services: Services = Depends(get_servi
                 if session.aggregate and tp.tenant_kind == "msp" and via is None:
                     mode = "aggregate"
                     aggregate_ids = await authz.aggregate_tenant_ids(conn, session.user_id, tp.tenant_id)
+    withheld: frozenset[str] = frozenset()
+    if not session.mfa:
+        withheld = permissions & PRIVILEGED
+        permissions = permissions - withheld
+        if session.is_platform_admin:
+            withheld |= {PLATFORM_ADMIN}
     principal = Principal(
         user_id=session.user_id,
         email=session.email,
         session_id=session.id,
         api_key_id=None,
-        is_platform_admin=session.is_platform_admin,
+        is_platform_admin=session.is_platform_admin and session.mfa,
         mode=mode,  # type: ignore[arg-type]
         tenant_id=tenant_id,
         tenant_kind=tenant_kind,
@@ -129,9 +149,20 @@ async def get_principal(request: Request, services: Services = Depends(get_servi
         aggregate_tenant_ids=aggregate_ids,
         step_up_at=session.step_up_at,
         ip=ip,
+        withheld=withheld,
     )
     request.state.principal = principal
     return principal
+
+
+def mfa_session_required() -> ProblemError:
+    return ProblemError(
+        403,
+        "auth.mfa_session_required",
+        "Sign-in with MFA required",
+        "This permission needs a session established with your authenticator. "
+        "Confirm with your authenticator code, or sign out and sign in again.",
+    )
 
 
 def requires(permission: str, *, step_up: bool = False, aggregate: bool = False) -> dict[str, Any]:
@@ -152,6 +183,8 @@ def requires(permission: str, *, step_up: bool = False, aggregate: bool = False)
                 "Read-only view",
                 "The 'All customers' view is read-only. Select a single customer.",
             )
+        if permission in principal.withheld:
+            raise mfa_session_required()
         if not principal.has(permission):
             raise forbidden()
         if step_up and not principal.stepped_up(services.settings.step_up_minutes):
@@ -164,24 +197,37 @@ def requires(permission: str, *, step_up: bool = False, aggregate: bool = False)
 
     return {
         "dependencies": [Depends(check)],
-        "openapi_extra": {"x-required-permission": permission, "x-step-up": step_up, "x-aggregate": aggregate},
+        "openapi_extra": {
+            "x-required-permission": permission,
+            "x-step-up": step_up,
+            "x-aggregate": aggregate,
+            "security": BEARER,
+        },
     }
 
 
 def authenticated() -> dict[str, Any]:
-    return {"dependencies": [Depends(get_session)], "openapi_extra": {"x-required-permission": AUTHENTICATED}}
+    return {
+        "dependencies": [Depends(get_session)],
+        "openapi_extra": {"x-required-permission": AUTHENTICATED, "security": BEARER},
+    }
 
 
 def platform_admin() -> dict[str, Any]:
     async def check(principal: Principal = Depends(get_principal)) -> None:
+        if PLATFORM_ADMIN in principal.withheld:
+            raise mfa_session_required()
         if not principal.is_platform_admin:
             raise forbidden()
 
-    return {"dependencies": [Depends(check)], "openapi_extra": {"x-required-permission": PLATFORM_ADMIN}}
+    return {
+        "dependencies": [Depends(check)],
+        "openapi_extra": {"x-required-permission": PLATFORM_ADMIN, "security": BEARER},
+    }
 
 
 def public() -> dict[str, Any]:
-    return {"openapi_extra": {"x-required-permission": PUBLIC}}
+    return {"openapi_extra": {"x-required-permission": PUBLIC, "security": []}}
 
 
 def internal(which: Literal["runner", "workflow"] = "runner") -> dict[str, Any]:
@@ -201,10 +247,11 @@ def internal(which: Literal["runner", "workflow"] = "runner") -> dict[str, Any]:
 
     return {
         "dependencies": [Depends(check)],
-        "openapi_extra": {"x-required-permission": INTERNAL},
+        "openapi_extra": {"x-required-permission": INTERNAL, "security": [{f"{which}Token": []}]},
         "include_in_schema": True,
     }
 
 
 def webhook_hmac() -> dict[str, Any]:
-    return {"openapi_extra": {"x-required-permission": WEBHOOK_HMAC}}
+    # Authenticated in the handler by the per-instance HMAC signature, not by a token.
+    return {"openapi_extra": {"x-required-permission": WEBHOOK_HMAC, "security": []}}

@@ -20,6 +20,8 @@ from typing import Any
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from app.telemetry import current_trace_id
+
 request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
 
 _VALID_ID = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
@@ -83,6 +85,9 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
             "request_id": request_id_var.get(),
         }
+        trace_id = current_trace_id()
+        if trace_id:
+            out["trace_id"] = trace_id
         for key, value in vars(record).items():
             if key not in _STANDARD and not key.startswith("_"):
                 out[key] = value
@@ -131,7 +136,14 @@ class RequestContextMiddleware:
             if message["type"] == "http.response.start":
                 status = message["status"]
                 message.setdefault("headers", [])
-                message["headers"] = [*message["headers"], (b"x-request-id", rid.encode())]
+                # Every API response (P7, DAST): no MIME sniffing, never framed.
+                present = {k.lower() for k, _ in message["headers"]}
+                extra = [(b"x-request-id", rid.encode())]
+                if b"x-content-type-options" not in present:
+                    extra.append((b"x-content-type-options", b"nosniff"))
+                if b"x-frame-options" not in present:
+                    extra.append((b"x-frame-options", b"DENY"))
+                message["headers"] = [*message["headers"], *extra]
             await send(message)
 
         try:

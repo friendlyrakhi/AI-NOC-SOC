@@ -78,6 +78,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           </form>
         </div>
       </header>
+      {(me.withheld_permissions?.length ?? 0) > 0 && (
+        <p role="status" className="border-warning bg-warning/10 border-b px-4 py-1.5 text-xs">
+          Some of your permissions need a session confirmed with your authenticator. Confirm a code when an action asks for
+          it, or sign out and sign in again.
+        </p>
+      )}
       <PortalFrame nav={nav}>{children}</PortalFrame>
     </>
   );

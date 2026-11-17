@@ -1,0 +1,10 @@
+# Grafana provisioning (P7): the platform dashboards, read-only from the repository.
+apiVersion: 1
+providers:
+  - name: "NOC/SOC platform"
+    folder: "NOC/SOC platform"
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /otel-lgtm/nocsoc-dashboards

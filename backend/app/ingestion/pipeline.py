@@ -7,7 +7,9 @@ Order of checks for every message:
 3. Normalize with the connector's pure ``normalize``; drift or invalid output -> dead letter.
 4. Idempotency ledger: a redelivered message has no second effect.
 5. Write: alerts (de-duplicated by fingerprint), assets (resolved by identifiers),
-   vulnerability findings, then telemetry rows in ClickHouse.
+   vulnerability findings, and a telemetry outbox row in the same transaction. After the commit
+   the telemetry is delivered to ClickHouse and OpenSearch; what fails is retried by the relay
+   (``app.ingestion.outbox``), so it is at-least-once.
 
 All tenant writes run as ``nocsoc_worker`` inside a transaction whose tenant context is the
 verified owner, so RLS still applies if this code has a bug.
@@ -18,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import time
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -31,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from app.db.engines import AppDatabase
 from app.events import EVENT_COLUMNS, to_event_row
 from app.incidents import engine
+from app.ingestion import outbox
 from app.ingestion.limits import MAX_DEPTH, MAX_RECORD_BYTES, json_depth
 from app.streaming import Envelope
 from nocsoc_connector_sdk import (
@@ -51,6 +55,8 @@ logger = logging.getLogger(__name__)
 
 Result = Literal["stored", "duplicate", "dead_letter"]
 
+OWNER_CACHE_SECONDS = 30
+
 ASSET_TYPE_BY_REF = {"hostname": "host", "fqdn": "host", "ip": "host", "cloud_id": "cloud_resource", "upn": "identity"}
 
 
@@ -63,6 +69,17 @@ class Outcome:
     incidents: list[str] = field(default_factory=list)
     suppressed: list[str] = field(default_factory=list)
     telemetry: dict[str, list[list[Any]]] = field(default_factory=dict)
+    outbox_id: int | None = None
+    emitted_at: datetime | None = None  # envelope time at the connector (for ingest latency)
+
+
+@dataclass(frozen=True)
+class Prepared:
+    """A message that passed checks 1-3 and is ready to store."""
+
+    env: Envelope
+    owner: UUID
+    records: list[Any]
 
 
 class DeadLetterError(Exception):
@@ -99,35 +116,34 @@ class Ingestor:
         database: str = "nocsoc",
         quota: Callable[[UUID], Awaitable[bool]] | None = None,
         search: Any | None = None,
+        *,
+        deliver_immediately: bool = True,
     ) -> None:
+        # False in the ingest worker: it flushes the outbox once per poll batch instead.
+        self.deliver_immediately = deliver_immediately
+        self._owners: dict[UUID, tuple[float, Any]] = {}
         self.quota = quota
         self.db = db
         self.analytics = analytics
         self.database = database
         # OpenSearch indexer (P6): canonical events become searchable per tenant.
         self.search = search
+        self.writer = outbox.TelemetryWriter(analytics, database, self.COLUMNS, search)
 
     # ------------------------------------------------------------------ entry point
     async def process(self, value: bytes) -> Outcome:
-        try:
-            env = self._parse(value)
-        except DeadLetterError as dl:
-            await self.dead_letter(None, None, dl, value)
-            return Outcome("dead_letter", dl.reason)
-        try:
-            owner = await self._verify_owner(env)
-            if self.quota is not None and not await self.quota(owner):
-                raise DeadLetterError("quota_exceeded", "tenant ingest quota exceeded for this minute")
-            records = self._normalize(env)
-        except DeadLetterError as dl:
-            tenant = env.tenantid if dl.reason != "ownership_mismatch" else None
-            await self.dead_letter(tenant, env.instanceid, dl, value)
-            return Outcome("dead_letter", dl.reason)
+        prepared = await self.prepare(value)
+        if isinstance(prepared, Outcome):
+            return prepared
+        return await self.store_prepared(prepared)
 
+    async def store_prepared(self, prepared: Prepared) -> Outcome:
+        env, owner, records = prepared.env, prepared.owner, prepared.records
         outcome = await self._store(env, owner, records)
         outcome.tenant = owner
-        if outcome.result == "stored":
-            await self._write_telemetry(env, owner, outcome.telemetry)
+        outcome.emitted_at = env.time
+        if outcome.result == "stored" and outcome.outbox_id is not None and self.deliver_immediately:
+            await self._deliver(owner, outcome)
         return outcome
 
     # ------------------------------------------------------------------ checks
@@ -151,10 +167,21 @@ class Ingestor:
         return env
 
     async def _verify_owner(self, env: Envelope) -> UUID:
-        async with self.db.engine.begin() as conn:
-            row = (
-                await conn.execute(text("SELECT * FROM connector_instance_owner(:i)"), {"i": env.instanceid})
-            ).one_or_none()
+        """The instance's real owner, from the database. Cached briefly per worker (P7 tuning): an
+        instance's tenant and connector never change after creation; a deleted instance stops
+        being accepted within ``OWNER_CACHE_SECONDS``."""
+        cached = self._owners.get(env.instanceid)
+        if cached is not None and cached[0] > time.monotonic():
+            row = cached[1]
+        else:
+            async with self.db.engine.begin() as conn:
+                row = (
+                    await conn.execute(text("SELECT * FROM connector_instance_owner(:i)"), {"i": env.instanceid})
+                ).one_or_none()
+            if row is not None:
+                if len(self._owners) > 10_000:
+                    self._owners.clear()
+                self._owners[env.instanceid] = (time.monotonic() + OWNER_CACHE_SECONDS, row)
         if row is None:
             raise DeadLetterError("ownership_mismatch", "unknown instance")
         if row.tenant_id != env.tenantid or row.definition_id != env.connector:
@@ -197,6 +224,124 @@ class Ingestor:
         logger.warning("dead letter: %s (instance=%s)", dl.reason, instance)
 
     # ------------------------------------------------------------------ writes
+    @staticmethod
+    def is_telemetry(records: Sequence[Any]) -> bool:
+        """Only security events and metric points: nothing in Postgres but the idempotency ledger."""
+        return bool(records) and all(isinstance(r, SecurityEventV1 | MetricPointV1) for r in records)
+
+    def telemetry_rows(self, env: Envelope, tenant: UUID, records: Sequence[Any]) -> dict[str, list[list[Any]]]:
+        """ClickHouse rows (and OpenSearch event documents) for one message."""
+        rows: dict[str, list[list[Any]]] = {}
+        source_id = str(env.data.get("source_id", ""))
+        for index, rec in enumerate(records):
+            event = to_event_row(
+                rec,
+                tenant=tenant,
+                instance=env.instanceid,
+                connector=env.connector,
+                event_id=env.id,
+                source_id=source_id,
+                index=index,
+            )
+            if event is not None:
+                rows.setdefault("events", []).append(event)
+            if isinstance(rec, SecurityEventV1):
+                rows.setdefault("security_events", []).append(
+                    [
+                        tenant,
+                        env.instanceid,
+                        env.connector,
+                        rec.class_uid,
+                        rec.activity,
+                        rec.severity,
+                        _ch_dt(rec.observed_at),
+                        rec.message,
+                        rec.actor_user or "",
+                        rec.device_hostname or "",
+                        rec.src_ip or "",
+                        rec.dst_ip or "",
+                        rec.outcome,
+                        list(rec.mitre_techniques),
+                    ]
+                )
+            elif isinstance(rec, MetricPointV1):
+                rows.setdefault("metrics", []).append(
+                    [
+                        tenant,
+                        env.instanceid,
+                        env.connector,
+                        rec.name,
+                        rec.value,
+                        rec.unit,
+                        rec.asset_ref.kind,
+                        rec.asset_ref.value,
+                        _ch_dt(rec.observed_at),
+                    ]
+                )
+        observed = env.data.get("observed_at")
+        rows.setdefault("raw_events", []).append(
+            [
+                tenant,
+                env.instanceid,
+                env.connector,
+                env.stream,
+                env.id,
+                source_id,
+                env.trigger,
+                env.dataschema,
+                datetime.fromisoformat(observed) if isinstance(observed, str) else env.time,
+                json.dumps(env.data.get("payload", {}), separators=(",", ":")),
+            ]
+        )
+        return rows
+
+    async def prepare(self, value: bytes) -> Prepared | Outcome:
+        """Checks 1-3 (shape, ownership, quota, normalization). A dead letter is recorded here."""
+        try:
+            env = self._parse(value)
+        except DeadLetterError as dl:
+            await self.dead_letter(None, None, dl, value)
+            return Outcome("dead_letter", dl.reason)
+        try:
+            owner = await self._verify_owner(env)
+            if self.quota is not None and not await self.quota(owner):
+                raise DeadLetterError("quota_exceeded", "tenant ingest quota exceeded for this minute")
+            records = self._normalize(env)
+        except DeadLetterError as dl:
+            tenant = env.tenantid if dl.reason != "ownership_mismatch" else None
+            await self.dead_letter(tenant, env.instanceid, dl, value)
+            return Outcome("dead_letter", dl.reason)
+        return Prepared(env, owner, records)
+
+    async def store_telemetry_batch(self, tenant: UUID, items: Sequence[Prepared]) -> list[Outcome]:
+        """P7 fast path (NFR-2): telemetry-only messages of one tenant in ONE transaction: one ledger
+        insert for all their keys (duplicates drop out), one outbox row for all their rows."""
+        keys = [record_key(p.env) for p in items]
+        outcomes: list[Outcome] = []
+        async with self.db.tenant(tenant) as conn:
+            fresh = {
+                r[0]
+                for r in await conn.execute(
+                    text(
+                        "INSERT INTO ingest_seen (tenant_id, record_key) "
+                        "SELECT app_tenant(), k FROM unnest(CAST(:ks AS text[])) AS k "
+                        "ON CONFLICT DO NOTHING RETURNING record_key"
+                    ),
+                    {"ks": keys},
+                )
+            }
+            merged: dict[str, list[list[Any]]] = {}
+            for p, key in zip(items, keys, strict=True):
+                if key not in fresh:
+                    outcomes.append(Outcome("duplicate", tenant=tenant))
+                    continue
+                fresh.discard(key)  # the same key twice in one batch counts once
+                for table, rows in self.telemetry_rows(p.env, tenant, p.records).items():
+                    merged.setdefault(table, []).extend(rows)
+                outcomes.append(Outcome("stored", tenant=tenant, emitted_at=p.env.time))
+            await outbox.add(conn, self.writer.sinks, merged)
+        return outcomes
+
     async def _store(self, env: Envelope, tenant: UUID, records: Sequence[Any]) -> Outcome:
         outcome = Outcome("stored")
         async with self.db.tenant(tenant) as conn:
@@ -213,19 +358,9 @@ class Ingestor:
                 return Outcome("duplicate")
             changes = engine.Changes()
             source_id = str(env.data.get("source_id", ""))
+            outcome.telemetry = self.telemetry_rows(env, tenant, records)
             new_alerts: list[tuple[str, bool]] = []
-            for index, rec in enumerate(records):
-                event = to_event_row(
-                    rec,
-                    tenant=tenant,
-                    instance=env.instanceid,
-                    connector=env.connector,
-                    event_id=env.id,
-                    source_id=source_id,
-                    index=index,
-                )
-                if event is not None:
-                    outcome.telemetry.setdefault("events", []).append(event)
+            for rec in records:
                 if isinstance(rec, AlertV1):
                     upserted = await self._upsert_alert(conn, env, rec, source_id)
                     if upserted:
@@ -243,39 +378,6 @@ class Ingestor:
                     )
                 elif isinstance(rec, VulnFindingV1):
                     await self._upsert_vuln(conn, env, rec)
-                elif isinstance(rec, SecurityEventV1):
-                    outcome.telemetry.setdefault("security_events", []).append(
-                        [
-                            tenant,
-                            env.instanceid,
-                            env.connector,
-                            rec.class_uid,
-                            rec.activity,
-                            rec.severity,
-                            _ch_dt(rec.observed_at),
-                            rec.message,
-                            rec.actor_user or "",
-                            rec.device_hostname or "",
-                            rec.src_ip or "",
-                            rec.dst_ip or "",
-                            rec.outcome,
-                            list(rec.mitre_techniques),
-                        ]
-                    )
-                elif isinstance(rec, MetricPointV1):
-                    outcome.telemetry.setdefault("metrics", []).append(
-                        [
-                            tenant,
-                            env.instanceid,
-                            env.connector,
-                            rec.name,
-                            rec.value,
-                            rec.unit,
-                            rec.asset_ref.kind,
-                            rec.asset_ref.value,
-                            _ch_dt(rec.observed_at),
-                        ]
-                    )
                 elif isinstance(rec, TicketV1):
                     await engine.apply_ticket(conn, rec, env.instanceid, changes)
             # Correlation after all records of the message are stored (topology first).
@@ -283,21 +385,7 @@ class Ingestor:
                 await engine.after_alert(conn, alert_id, inserted=inserted, changes=changes)
             outcome.incidents = sorted(changes.incidents)
             outcome.suppressed = changes.suppressed
-            observed = env.data.get("observed_at")
-            outcome.telemetry.setdefault("raw_events", []).append(
-                [
-                    tenant,
-                    env.instanceid,
-                    env.connector,
-                    env.stream,
-                    env.id,
-                    source_id,
-                    env.trigger,
-                    env.dataschema,
-                    datetime.fromisoformat(observed) if isinstance(observed, str) else env.time,
-                    json.dumps(env.data.get("payload", {}), separators=(",", ":")),
-                ]
-            )
+            outcome.outbox_id = await outbox.add(conn, self.writer.sinks, outcome.telemetry)
         return outcome
 
     async def _resolve_asset(
@@ -516,29 +604,17 @@ ON CONFLICT (tenant_id, external_id) DO UPDATE SET
         "events": EVENT_COLUMNS,
     }
 
-    async def _write_telemetry(self, env: Envelope, tenant: UUID, rows: dict[str, list[list[Any]]]) -> None:
-        """Best effort after the Postgres commit: a telemetry outage must not block alerts.
-
-        A failed insert is logged and those telemetry rows are not retried (the alert, asset and
-        finding writes are already committed). Documented as a P2 residual risk; a transactional
-        outbox for telemetry is still a residual risk (P7). The same applies to the OpenSearch copy of
-        canonical events.
-        """
-        if self.analytics is not None:
-            for table, data in rows.items():
-                if not data:
-                    continue
-                try:
-                    await self.analytics.insert(f"{self.database}.{table}", data, column_names=self.COLUMNS[table])
-                except Exception:
-                    logger.exception("telemetry insert failed (table=%s instance=%s)", table, env.instanceid)
-        events = rows.get("events") or []
-        if self.search is not None and events:
-            from app.searchstore import event_document
-
-            try:
-                failed = await self.search.bulk([event_document(r, self.COLUMNS["events"]) for r in events])
-                if failed:
-                    logger.warning("search indexing failed for %d event(s) (instance=%s)", failed, env.instanceid)
-            except Exception:
-                logger.exception("search indexing failed (instance=%s)", env.instanceid)
+    async def _deliver(self, tenant: UUID, outcome: Outcome) -> None:
+        """Immediate delivery after the commit; failures stay in the outbox for the relay."""
+        if outcome.outbox_id is None:
+            return
+        try:
+            failed = await self.writer.deliver(outcome.telemetry, self.writer.sinks)
+        except Exception as exc:  # never fail the (already committed) message
+            logger.warning("telemetry delivery failed: %s", type(exc).__name__)
+            return
+        try:
+            async with self.db.tenant(tenant) as conn:
+                await outbox.settle(conn, outcome.outbox_id, failed)
+        except Exception as exc:  # the relay re-delivers; ids/upserts make that harmless
+            logger.warning("telemetry outbox settle failed: %s", type(exc).__name__)

@@ -1,0 +1,17 @@
+<!-- Hardened profile (P7): HTTPS on 8443, plain HTTP 8123 removed. The native port stays for the
+     in-container healthcheck and the backup tool only (it is not published and no client uses it). -->
+<clickhouse>
+    <http_port remove="1"/>
+    <https_port>8443</https_port>
+    <openSSL>
+        <server>
+            <certificateFile>/run/secrets/clickhouse_tls_crt</certificateFile>
+            <privateKeyFile>/run/secrets/clickhouse_tls_key</privateKeyFile>
+            <verificationMode>none</verificationMode>
+            <loadDefaultCAFile>false</loadDefaultCAFile>
+            <cacheSessions>true</cacheSessions>
+            <disableProtocols>sslv2,sslv3,tlsv1,tlsv1_1</disableProtocols>
+            <preferServerCiphers>true</preferServerCiphers>
+        </server>
+    </openSSL>
+</clickhouse>

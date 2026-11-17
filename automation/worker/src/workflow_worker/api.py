@@ -5,23 +5,33 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
+from opentelemetry import propagate
 
 
 class WorkflowApi:
-    def __init__(self, base_url: str, token: str, transport: httpx.AsyncBaseTransport | None = None) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        token: str,
+        transport: httpx.AsyncBaseTransport | None = None,
+        verify: str | bool = True,
+    ) -> None:
         self._client = httpx.AsyncClient(
             base_url=base_url.rstrip("/") + "/api/v1/internal/workflow",
             headers={"X-Workflow-Token": token},
             timeout=30.0,
             transport=transport,
             follow_redirects=False,
+            verify=verify,  # hardened profile: the platform CA
         )
 
     async def close(self) -> None:
         await self._client.aclose()
 
     async def _post(self, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
-        r = await self._client.post(path, json=body or {})
+        headers: dict[str, str] = {}
+        propagate.inject(headers)  # W3C trace context: the API continues the activity's trace
+        r = await self._client.post(path, json=body or {}, headers=headers)
         r.raise_for_status()
         data: dict[str, Any] = r.json()
         return data

@@ -23,6 +23,7 @@ from app.actions.dsl import validate_definition
 from app.core.authz.deps import get_principal, platform_admin, requires
 from app.core.authz.principal import Principal
 from app.core.tenancy.common import record, tenant_tx
+from app.core.types import StrictBool
 from app.errors import ProblemError, not_found
 from app.services import Services, get_services
 
@@ -76,8 +77,8 @@ async def get_catalog(services: Svc, p: P) -> list[CatalogEntry]:
 
 class PolicyIn(BaseModel):
     tier_override: Literal["T0", "T1", "T2", "T3"] | None = None
-    allowed: bool = True
-    require_justification: bool = False
+    allowed: StrictBool = True
+    require_justification: StrictBool = False
 
 
 @router.put("/actions/policies/{action_key}", response_model=CatalogEntry, **requires("action:policy", step_up=True))
@@ -397,7 +398,7 @@ class KillSwitchOut(BaseModel):
 
 
 class KillSwitchIn(BaseModel):
-    engaged: bool
+    engaged: StrictBool
     reason: str = Field(min_length=1, max_length=500)
 
 

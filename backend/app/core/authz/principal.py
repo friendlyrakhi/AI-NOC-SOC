@@ -27,6 +27,9 @@ class Principal:
     aggregate_tenant_ids: tuple[UUID, ...] = field(default_factory=tuple)
     step_up_at: datetime | None = None
     ip: str | None = None
+    # Privileged permissions the user holds but this session may not use, because it was not
+    # established with MFA (e.g. a role granted mid-session). Sign in again or step up to use them.
+    withheld: frozenset[str] = frozenset()
 
     @property
     def actor(self) -> Actor:

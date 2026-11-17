@@ -33,6 +33,7 @@ from app.analytics import reader_query
 from app.core.authz.deps import get_principal, requires
 from app.core.authz.principal import Principal
 from app.core.cache import tenant_budget
+from app.core.types import IsoDatetime
 from app.errors import ProblemError
 from app.services import Services, get_services
 from nocsoc_connector_sdk import AlertV1, SecurityEventV1, TicketV1
@@ -240,8 +241,8 @@ async def search_events(
     q: str | None = Query(
         default=None, max_length=200, description="Case-insensitive substring of title, asset or user."
     ),
-    since: datetime | None = None,
-    until: datetime | None = None,
+    since: IsoDatetime | None = None,
+    until: IsoDatetime | None = None,
     cursor: str | None = Query(default=None, max_length=500),
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> EventPage:
@@ -293,8 +294,8 @@ async def events_histogram(
     services: Svc,
     p: P,
     domain: Literal["noc", "soc"] | None = None,
-    since: datetime | None = None,
-    until: datetime | None = None,
+    since: IsoDatetime | None = None,
+    until: IsoDatetime | None = None,
     bucket_minutes: Annotated[int, Query(ge=1, le=1440)] = 60,
 ) -> list[HistogramBucket]:
     since, until = _window(since, until)

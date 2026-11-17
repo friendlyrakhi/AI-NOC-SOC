@@ -50,11 +50,9 @@ async def _drain(settings: Settings, minimum: int, idle_seconds: float, max_seco
     try:
         while loop.time() < deadline:
             batches = await worker.consumer.getmany(timeout_ms=500, max_records=200)
-            for _tp, messages in batches.items():
-                for msg in messages:
-                    if msg.value is not None:
-                        await worker.handle(msg.value)
+            await worker.process_batches(batches)  # the production path (incl. the telemetry fast path)
             if batches:
+                await worker.flush_telemetry()
                 await worker.consumer.commit()
                 last_activity = loop.time()
             handled = sum(worker.stats.values())

@@ -52,7 +52,9 @@ def replay(s: StreamEnv, scenario: str, email: str = ADMIN, slug: str = "globex"
 def open_incident(s: StreamEnv, email: str = ADMIN) -> dict[str, Any]:
     items = s.api.get(email, "/incidents", params={"open_only": "true"}).json()["items"]
     assert items, "expected an open incident"
-    return items[0]  # type: ignore[no-any-return]
+    # The correlated incident (most alerts), not whatever sorts first: the ingest worker processes
+    # partitions concurrently, so a ticket-only incident can be listed first (P7).
+    return max(items, key=lambda i: (i["alert_count"], i["number"]))  # type: ignore[no-any-return]
 
 
 def check_grounded(run: dict[str, Any]) -> None:

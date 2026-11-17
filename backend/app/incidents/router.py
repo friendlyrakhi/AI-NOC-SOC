@@ -21,6 +21,7 @@ from app import live
 from app.core.authz.deps import get_principal, requires
 from app.core.authz.principal import Principal
 from app.core.tenancy.common import record, tenant_tx
+from app.core.types import PG_BIGINT_MAX, IsoDatetime, StrictBool, StrictInt
 from app.errors import ProblemError, not_found
 from app.incidents import store
 from app.incidents.correlation import BUILTIN_RULES, RULE_KEYS, effective_rules
@@ -108,14 +109,14 @@ class IncidentPatch(BaseModel):
     priority: Priority | None = None
     assignee_id: UUID | None = None
     commander_id: UUID | None = None
-    clear_assignee: bool = False
-    version: int = Field(ge=1)
+    clear_assignee: StrictBool = False
+    version: StrictInt = Field(ge=1)
 
 
 class StatusChange(BaseModel):
     to: IncidentStatus
     reason: str | None = Field(default=None, max_length=1000)
-    version: int = Field(ge=1)
+    version: StrictInt = Field(ge=1)
 
 
 class Escalation(BaseModel):
@@ -155,7 +156,7 @@ class TaskOut(BaseModel):
 class TaskCreate(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     assignee_id: UUID | None = None
-    due_at: datetime | None = None
+    due_at: IsoDatetime | None = None
     runbook_ref: str | None = Field(default=None, max_length=300)
 
 
@@ -163,7 +164,7 @@ class TaskPatch(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=300)
     status: Literal["open", "in_progress", "done"] | None = None
     assignee_id: UUID | None = None
-    version: int = Field(ge=1)
+    version: StrictInt = Field(ge=1)
 
 
 class LinkedAlert(BaseModel):
@@ -599,7 +600,7 @@ async def get_timeline(
     incident_id: UUID,
     services: Svc,
     p: P,
-    after: Annotated[int, Query(ge=0)] = 0,
+    after: Annotated[int, Query(ge=0, le=PG_BIGINT_MAX)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 200,
 ) -> list[TimelineOut]:
     """Oldest first. ``after`` is the last entry id already seen (for live polling)."""
@@ -877,8 +878,8 @@ class RuleOut(BaseModel):
 
 
 class RulePatch(BaseModel):
-    enabled: bool
-    window_minutes: int = Field(ge=1, le=1440)
+    enabled: StrictBool
+    window_minutes: StrictInt = Field(ge=1, le=1440)
 
 
 @router.get("/correlation-rules", response_model=list[RuleOut], **requires("incident:read"))
@@ -922,13 +923,13 @@ async def patch_rule(key: str, body: RulePatch, services: Svc, p: P) -> list[Rul
 
 
 class SlaTarget(BaseModel):
-    ack: int = Field(ge=1, le=100_000)
-    resolve: int = Field(ge=1, le=1_000_000)
+    ack: StrictInt = Field(ge=1, le=100_000)
+    resolve: StrictInt = Field(ge=1, le=1_000_000)
 
 
 class SlaPolicy(BaseModel):
     targets: dict[Priority, SlaTarget]
-    custom: bool = False
+    custom: StrictBool = False
 
 
 @router.get("/sla-policy", response_model=SlaPolicy, **requires("incident:read"))

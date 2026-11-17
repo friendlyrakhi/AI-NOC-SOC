@@ -11,15 +11,18 @@
   scripts\dev.ps1 reset                  # down + DELETE volumes (asks first)
   scripts\dev.ps1 seed                   # create mock MSP/customers/users (writes dev-users.json)
   scripts\dev.ps1 totp msp.admin@acme.example   # current MFA code for a seeded user
+  scripts\dev.ps1 verify-audit           # audit chains + external anchors (exit 1 on a problem)
+  scripts\dev.ps1 up -Hardened           # TLS between services, secure cookies, OpenBao (https://127.0.0.1:3443)
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Position = 0)][ValidateSet('up', 'down', 'reset', 'logs', 'status', 'build', 'seed', 'totp', 'migrate')]
+    [Parameter(Position = 0)][ValidateSet('up', 'down', 'reset', 'logs', 'status', 'build', 'seed', 'totp', 'migrate', 'verify-audit')]
     [string]$Command = 'status',
     [Parameter(Position = 1)][string]$Service,
     [string[]]$Profiles = @('core', 'stream', 'ai', 'workflow', 'search'),
     [switch]$Build,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$Hardened
 )
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\lib.ps1"
@@ -29,7 +32,14 @@ if (-not (Test-Path (Join-Path $root '.env')) -or -not (Test-Path (Join-Path $ro
     throw 'Not bootstrapped. Run scripts\bootstrap.ps1 first.'
 }
 
-$compose = Get-ComposeArgs
+$compose = Get-ComposeArgs -Hardened:$Hardened
+if ($Hardened -and -not (Test-Path (Join-Path $root 'infrastructure\secrets\tls\ca.crt'))) {
+    Invoke-Uv run python (Join-Path $PSScriptRoot 'certs.py')
+}
+# The observability profile (P7) turns on OpenTelemetry export in the platform services.
+$env:NOCSOC_OTEL_ENABLED = if ($Profiles -contains 'observability') { 'true' } else { 'false' }
+# The sso profile (P7) turns on the optional Keycloak sign-in in the API.
+$env:NOCSOC_OIDC_ENABLED = if ($Profiles -contains 'sso') { 'true' } else { 'false' }
 $profileArgs = @()
 foreach ($p in $Profiles) { $profileArgs += @('--profile', $p) }
 # Teardown and inspection cover every profile, so nothing is left running.
@@ -41,11 +51,17 @@ switch ($Command) {
         if ($Build) { $upArgs += '--build' }
         Write-Step "starting profiles: $($Profiles -join ', ')"
         Invoke-Checked docker @compose @profileArgs @upArgs
+        if ($Hardened) {
+            Write-Step 'moving local-key secrets to OpenBao (idempotent)'
+            Invoke-Checked docker @compose @profileArgs run --rm -T migrate python -m app.tools.rewrap_secrets
+        }
         & docker @compose @allProfiles ps
         Write-Host ''
+        if ($Hardened) { Write-Host 'Web:     https://127.0.0.1:3443  (trust infrastructure\secrets\tls\ca.crt)' }
         Write-Host 'Web:     http://127.0.0.1:3000'
         Write-Host 'API:     http://127.0.0.1:8100/api/v1/docs'
         Write-Host 'Mailpit: http://127.0.0.1:8025'
+        if ($Profiles -contains 'observability') { Write-Host 'Grafana: http://127.0.0.1:3001  (dashboards: NOC/SOC platform)' }
     }
     'build' { Invoke-Checked docker @compose @profileArgs build }
     'down' { Invoke-Checked docker @compose @allProfiles down }
@@ -62,6 +78,7 @@ switch ($Command) {
         & docker @compose @allProfiles @logArgs
     }
     'migrate' { Invoke-Checked docker @compose @profileArgs run --rm -T migrate }
+    'verify-audit' { Invoke-Checked docker @compose --profile tools run --rm -T audit-verify }
     'seed' {
         $out = Join-Path $root 'infrastructure\secrets\dev-users.json'
         $ErrorActionPreference = 'Continue'
