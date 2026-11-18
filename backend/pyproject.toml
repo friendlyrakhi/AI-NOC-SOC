@@ -18,7 +18,7 @@ dependencies = [
   "redis>=5.2",
   "aiokafka>=0.12",
   "temporalio>=1.8",
-  "clickhouse-connect[async]>=0.8",
+  "clickhouse-connect[async]>=1.12.0",
   "nocsoc-connectors",
   "opentelemetry-api>=1.28",
   "opentelemetry-sdk>=1.28",
