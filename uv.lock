@@ -1313,7 +1313,7 @@ requires-dist = [
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.9" },
     { name = "pyotp", specifier = ">=2.9" },
     { name = "redis", specifier = ">=5.2" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.36" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.1.8" },
     { name = "temporalio", specifier = ">=1.8" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
