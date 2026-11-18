@@ -1298,7 +1298,7 @@ requires-dist = [
     { name = "aiokafka", specifier = ">=0.12" },
     { name = "alembic", specifier = ">=1.14" },
     { name = "argon2-cffi", specifier = ">=23.1" },
-    { name = "clickhouse-connect", extras = ["async"], specifier = ">=0.8" },
+    { name = "clickhouse-connect", extras = ["async"], specifier = ">=1.12.0" },
     { name = "cryptography", specifier = ">=44" },
     { name = "email-validator", specifier = ">=2.2" },
     { name = "fastapi", specifier = ">=0.115" },
